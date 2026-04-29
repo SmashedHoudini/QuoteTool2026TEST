@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCC Quote Tool</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- React and Babel CDNs -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- html2canvas and jsPDF for 1:1 Perfect PDF Capture -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- LZ-String for URL Compression -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3ede0;
+            color: #000000;
+        }
+
+        /* Remove number input spinners */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        .verizon-red { color: #f50a23; }
+        .bg-verizon-red { background-color: #f50a23; }
+        
+        .hardware-btn {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Prevent scrolling from changing numbers */
+        input[type=number] {
+            touch-action: manipulation;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+
+        const SMARTPHONE_PLANS = [
+            { name: 'Unlimited Welcome', costs: [75, 65, 50, 40], autopay: 10 },
+            { name: 'Unlimited Plus', costs: [90, 80, 65, 55], autopay: 10, discountSlots: 1 },
+            { name: 'Unlimited Ultimate', costs: [100, 90, 75, 65], autopay: 10, discountSlots: 2 },
+            { name: 'Custom', costs: [0, 0, 0, 0], autopay: 0 }
+        ];
+
+        const TABLET_PLANS = [
+            { name: 'Welcome', price: 20 },
+            { name: 'Unlimited', price: 40 },
+            { name: 'Unlimited Plus', price: 50 },
+            { name: 'Custom', price: 0 }
+        ];
+
+        const WATCH_PLANS = [
+            { name: 'Unlimited', price: 15 },
+            { name: 'Unlimited Plus', price: 25 },
+            { name: 'Custom', price: 0 }
+        ];
+
+        const HOME_INTERNET_PLANS = [
+            { name: 'LTE Home', price: 60, mhDiscount: 15, autopay: 10 },
+            { name: 'LTE Home Plus', price: 80, mhDiscount: 15, autopay: 10 },
+            { name: '5G Home', price: 60, mhDiscount: 15, autopay: 10 },
+            { name: '5G Home Plus', price: 70, mhDiscount: 15, autopay: 10 },
+            { name: '5G Home Ultimate', price: 85, mhDiscount: 15, autopay: 10 },
+            { name: 'VHI Lite', price: 60, mhDiscount: 15, autopay: 10 },
+            { name: 'Custom', price: 0, mhDiscount: 0, autopay: 0 }
+        ];
+
+        const PERKS = [
+            { name: 'Disney Bundle', cost: 10, savings: 9.99 },
+            { name: 'Netflix & HBO Max', cost: 10, savings: 8.98 },
+            { name: 'Google AI Pro', cost: 10, savings: 9.99 },
+            { name: 'Apple One Individual', cost: 15, savings: 4.95 },
+            { name: 'Apple One Family', cost: 20, savings: 5.95 },
+            { name: 'Apple Music Family', cost: 10, savings: 6.99 },
+            { name: '100GB Hotspot', cost: 10, savings: 30 },
+            { name: 'YouTube Premium', cost: 10, savings: 3.99 },
+            { name: 'Unlimited Cloud Storage', cost: 10, savings: 3.99 },
+            { name: 'Verizon Family Plus', cost: 10, savings: 4.99 },
+            { name: 'Second Number', cost: 10, savings: 5 },
+            { name: '3 TravelPass Days', cost: 10, savings: 26 },
+            { name: 'Fox One', cost: 15, savings: 4.99 },
+        ];
+
+        const Icon = ({ name, size = 18, className = "" }) => {
+            const iconData = lucide.icons[name] || lucide[name];
+            if (!iconData) return null;
+            return (
+                <svg
+                    width={size} height={size} viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                    className={className}
+                >
+                    {iconData.map(([tag, attrs], i) => React.createElement(tag, { ...attrs, key: i }))}
+                </svg>
+            );
+        };
+
+        const App = () => {
+            const [view, setView] = useState('rep');
+            const [customerViewMode, setCustomerViewMode] = useState('detailed');
+            const [customerName, setCustomerName] = useState('');
+            const [showNameField, setShowNameField] = useState(false);
+            const [lines, setLines] = useState([]);
+            const [accountAdjustments, setAccountAdjustments] = useState([]);
+            const [multiDeviceProtection, setMultiDeviceProtection] = useState(false);
+            const [activePerkLineId, setActivePerkLineId] = useState(null);
+            const [activeHardwareLineId, setActiveHardwareLineId] = useState(null);
+            const [activeAdjLineId, setActiveAdjLineId] = useState(null);
+            const [showAccountAdj, setShowAccountAdj] = useState(false);
+            const [oneTimeCredits, setOneTimeCredits] = useState([]);
+            const [showOneTimeCreditsModal, setShowOneTimeCreditsModal] = useState(false);
+            const [editingLabelId, setEditingLabelId] = useState(null);
+            
+            // PDF Generation States
+            const [scale, setScale] = useState(1);
+            const [pdfHeight, setPdfHeight] = useState(1100);
+            const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+            // Share Link States
+            const [isCopied, setIsCopied] = useState(false);
+
+            // Import Quote from URL Hash on Initial Load
+            useEffect(() => {
+                const hash = window.location.hash;
+                let loadedFromHash = false;
+                
+                if (hash.startsWith('#quote=')) {
+                    try {
+                        const compressed = hash.substring(7);
+                        const jsonString = LZString.decompressFromEncodedURIComponent(compressed);
+                        if (jsonString) {
+                            const state = JSON.parse(jsonString);
+                            if (state.lines && state.lines.length > 0) {
+                                setLines(state.lines);
+                                loadedFromHash = true;
+                            }
+                            if (state.accountAdjustments) setAccountAdjustments(state.accountAdjustments);
+                            if (state.multiDeviceProtection !== undefined) setMultiDeviceProtection(state.multiDeviceProtection);
+                            if (state.oneTimeCredits) setOneTimeCredits(state.oneTimeCredits);
+                            if (state.customerName) {
+                                setCustomerName(state.customerName);
+                                setShowNameField(true);
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Failed to load quote from URL", e);
+                    }
+                }
+                
+                if (!loadedFromHash && lines.length === 0) {
+                    addLine('Smartphone');
+                }
+            }, []);
+
+            // Mobile view scaling logic ONLY for the print preview HTML Container
+            useEffect(() => {
+                const updateScale = () => {
+                    if (view === 'print') {
+                        if (window.innerWidth < 880) {
+                            setScale((window.innerWidth - 32) / 850); 
+                        } else {
+                            setScale(1);
+                        }
+                    }
+                };
+                window.addEventListener('resize', updateScale);
+                updateScale();
+                return () => window.removeEventListener('resize', updateScale);
+            }, [view]);
+
+            // Accurately measure dynamic height for drawing the red dashed preview lines
+            useEffect(() => {
+                if (view === 'print') {
+                    const checkHeight = () => {
+                        const el = document.getElementById('pdf-page-render-0');
+                        if (el && el.offsetHeight !== pdfHeight) {
+                            setPdfHeight(el.offsetHeight);
+                        }
+                    };
+                    checkHeight();
+                    const interval = setInterval(checkHeight, 300); // Catch async font/icon loads
+                    return () => clearInterval(interval);
+                }
+            }, [view, pdfHeight, customerViewMode]);
+
+            const handlePrintPreview = () => {
+                setView('print');
+                window.scrollTo(0, 0); // Always start preview at the top
+            };
+
+            const handleShareLink = () => {
+                const stateToSave = {
+                    lines,
+                    accountAdjustments,
+                    multiDeviceProtection,
+                    oneTimeCredits,
+                    customerName
+                };
+                const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(stateToSave));
+                const shareUrl = `${window.location.origin}${window.location.pathname}#quote=${compressed}`;
+                
+                // Fallback copy mechanism for broad browser/iframe support
+                const textArea = document.createElement("textarea");
+                textArea.value = shareUrl;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    setIsCopied(true);
+                    setTimeout(() => setIsCopied(false), 2000);
+                } catch (err) {
+                    console.error('Failed to copy link', err);
+                }
+                document.body.removeChild(textArea);
+            };
+
+            const addLine = (type) => {
+                let defaultPlan = '';
+                if (type === 'Smartphone') defaultPlan = SMARTPHONE_PLANS[0].name;
+                if (type === 'Tablet') defaultPlan = TABLET_PLANS[0].name;
+                if (type === 'Watch') defaultPlan = WATCH_PLANS[0].name;
+                if (type === 'Home Internet') defaultPlan = HOME_INTERNET_PLANS[0].name;
+                if (type === 'Custom') defaultPlan = 'Custom';
+
+                const newLine = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    label: `Line ${lines.length + 1}`,
+                    type,
+                    customLineTypeLabel: '',
+                    planName: defaultPlan,
+                    customPlanName: '',
+                    customPlanPrice: 0,
+                    customAutopayDiscount: 0,
+                    customDiscountSlots: 0,
+                    deviceName: '',
+                    devicePrice: 0,
+                    promoCredit: 0,
+                    perks: [],
+                    adjustments: [],
+                    individualProtection: false,
+                };
+                setLines(prev => [...prev, newLine]);
+            };
+
+            const copyLastLine = () => {
+                if (lines.length === 0) return;
+                const lastLine = lines[lines.length - 1];
+                const newLine = {
+                    ...lastLine,
+                    id: Math.random().toString(36).substr(2, 9),
+                    label: `Line ${lines.length + 1}`,
+                    perks: [...lastLine.perks],
+                    adjustments: lastLine.adjustments.map(a => ({ ...a, id: Math.random().toString(36).substr(2, 9) }))
+                };
+                setLines(prev => [...prev, newLine]);
+            };
+
+            const removeLine = (id) => setLines(prev => prev.filter(l => l.id !== id));
+            
+            const updateLine = (id, updates) => {
+                setLines(prev => prev.map(l => {
+                    if (l.id === id) {
+                        const updated = { ...l, ...updates };
+                        if (updates.type && updates.type !== l.type) {
+                            if (updates.type === 'Smartphone') updated.planName = SMARTPHONE_PLANS[0].name;
+                            else if (updates.type === 'Tablet') updated.planName = TABLET_PLANS[0].name;
+                            else if (updates.type === 'Watch') updated.planName = WATCH_PLANS[0].name;
+                            else if (updates.type === 'Home Internet') updated.planName = HOME_INTERNET_PLANS[0].name;
+                            else if (updates.type === 'Custom') updated.planName = 'Custom';
+                        }
+                        return updated;
+                    }
+                    return l;
+                }));
+            };
+
+            const togglePerk = (lineId, perkName) => {
+                setLines(prev => prev.map(l => {
+                    if (l.id === lineId) {
+                        const hasPerk = l.perks.includes(perkName);
+                        return { ...l, perks: hasPerk ? l.perks.filter(p => p !== perkName) : [...l.perks, perkName] };
+                    }
+                    return l;
+                }));
+            };
+
+            const calculations = useMemo(() => {
+                const spLines = lines.filter(l => l.type === 'Smartphone');
+                const pricingTier = Math.min(spLines.length - 1, 3);
+                let totalSlots = 0;
+                spLines.forEach(l => {
+                    if (l.planName === 'Custom') {
+                        totalSlots += (parseInt(l.customDiscountSlots) || 0);
+                    } else {
+                        const p = SMARTPHONE_PLANS.find(plan => plan.name === l.planName);
+                        if (p?.discountSlots) totalSlots += p.discountSlots;
+                    }
+                });
+
+                const baseProcessed = lines.map(line => {
+                    let planBase = 0, autopaySaving = 0, mhSaving = 0, displayName = line.planName, typeName = line.type;
+                    
+                    if (line.type === 'Custom') typeName = line.customLineTypeLabel || 'Custom Device';
+
+                    if (line.planName === 'Custom') {
+                        planBase = parseFloat(line.customPlanPrice) || 0;
+                        autopaySaving = parseFloat(line.customAutopayDiscount) || 0;
+                        displayName = line.customPlanName || 'Custom Plan';
+                    } else if (line.type === 'Smartphone') {
+                        const p = SMARTPHONE_PLANS.find(plan => plan.name === line.planName);
+                        planBase = p ? p.costs[pricingTier] : 0;
+                        autopaySaving = 10;
+                    } else if (line.type === 'Home Internet') {
+                        const p = HOME_INTERNET_PLANS.find(plan => plan.name === line.planName);
+                        planBase = p?.price || 0;
+                        autopaySaving = 10;
+                        if (spLines.length > 0) mhSaving = 15;
+                    } else if (line.type === 'Tablet') {
+                        const p = TABLET_PLANS.find(plan => plan.name === line.planName);
+                        planBase = p?.price || 0;
+                    } else if (line.type === 'Watch') {
+                        const p = WATCH_PLANS.find(plan => plan.name === line.planName);
+                        planBase = p?.price || 0;
+                    }
+
+                    const perkCost = line.perks.reduce((acc, name) => acc + (PERKS.find(p => p.name === name)?.cost || 0), 0);
+                    const adjSum = line.adjustments.reduce((acc, a) => acc + (a.type === 'credit' ? -(parseFloat(a.amount) || 0) : (parseFloat(a.amount) || 0)), 0);
+                    
+                    let protCost = 0;
+                    if (!multiDeviceProtection && line.individualProtection && line.type !== 'Home Internet') {
+                        if (line.type === 'Smartphone' || line.type === 'Watch') protCost = 19;
+                        if (line.type === 'Tablet') protCost = 16;
+                    }
+
+                    const deviceMonthly = Math.max(0, (line.devicePrice / 36) - (line.promoCredit / 36));
+                    const monthlyPromoCredit = (parseFloat(line.promoCredit) || 0) / 36;
+
+                    return { ...line, typeName, planBase, autopaySaving, mhSaving, displayName, perkCost, protCost, deviceMonthly, adjSum, monthlyPromoCredit, finalPlan: planBase - autopaySaving - mhSaving };
+                });
+
+                let slotsRemaining = totalSlots;
+                const finalLines = baseProcessed.map(l => {
+                    let discountedAmt = 0;
+                    let isDiscounted = false;
+                    if ((l.type === 'Tablet' || l.type === 'Watch') && slotsRemaining > 0) {
+                        slotsRemaining--;
+                        discountedAmt = l.planBase * 0.5;
+                        isDiscounted = true;
+                    }
+                    const actualPlanCost = isDiscounted ? (l.planBase - discountedAmt) : l.finalPlan;
+                    return { ...l, isDiscounted, connectedDiscountAmt: discountedAmt, totalLineCost: actualPlanCost + l.perkCost + l.protCost + l.deviceMonthly + l.adjSum };
+                });
+
+                const protectableLinesCount = lines.filter(l => l.type !== 'Home Internet' && l.type !== 'Custom').length;
+                const vmpCost = multiDeviceProtection ? Math.min(protectableLinesCount * 19, 68) : 0;
+                
+                const accAdjSum = accountAdjustments.reduce((acc, a) => acc + (a.type === 'credit' ? -(parseFloat(a.amount) || 0) : (parseFloat(a.amount) || 0)), 0);
+                const total = finalLines.reduce((acc, l) => acc + l.totalLineCost, 0) + vmpCost + accAdjSum;
+                
+                const totalFullDeviceSavings = finalLines.reduce((acc, l) => acc + (parseFloat(l.promoCredit) || 0), 0);
+                const totalAutopay = finalLines.reduce((acc, l) => acc + l.autopaySaving, 0);
+                const totalMHSavings = finalLines.reduce((acc, l) => acc + l.mhSaving, 0);
+                const totalConnectedDiscounts = finalLines.reduce((acc, l) => acc + (l.connectedDiscountAmt || 0), 0);
+                const totalMonthlyPromoCredits = finalLines.reduce((acc, l) => acc + l.monthlyPromoCredit, 0);
+                const allAdjustments = [...finalLines.flatMap(l => l.adjustments), ...accountAdjustments];
+                const totalAdjustmentCredits = allAdjustments.reduce((acc, a) => acc + (a.type === 'credit' ? (parseFloat(a.amount) || 0) : 0), 0);
+                
+                const totalOneTimeCredits = oneTimeCredits.reduce((acc, c) => acc + (parseFloat(c.amount) || 0), 0);
+
+                const totalMonthlySavings = totalMonthlyPromoCredits + totalAutopay + totalMHSavings + totalConnectedDiscounts + totalAdjustmentCredits;
+
+                return { 
+                    processedLines: finalLines, total, vmpCost, accAdjSum,
+                    totalWithoutAutopay: total + totalAutopay,
+                    totalFullDeviceSavings, totalMonthlySavings, totalAutopay, totalMHSavings, totalAdjustmentCredits, totalConnectedDiscounts, totalOneTimeCredits
+                };
+            }, [lines, multiDeviceProtection, accountAdjustments, oneTimeCredits]);
+
+            // --- REACT PAGINATION ENGINE ---
+            // This calculates exactly what fits on an 8.5x11 inch page and groups them.
+            const paginatedContent = useMemo(() => {
+                const pages = [];
+                let currentItems = [];
+                let currentHeight = 320; // Page 1 starts with the big Header block
+
+                const pushPage = (isLast = false) => {
+                    pages.push({ id: pages.length, items: [...currentItems], isFirst: pages.length === 0, isLast });
+                    currentItems = [];
+                    currentHeight = 60; // Top padding for subsequent pages
+                };
+
+                calculations.processedLines.forEach(line => {
+                    // Calculate precise pixel height of this element based on content
+                    let itemHeight = customerViewMode === 'detailed'
+                        ? 90 + (line.perks.length * 18) + (line.adjustments.length * 18) + (line.deviceName ? 20 : 0) + (line.autopaySaving > 0 ? 18 : 0) + (line.mhSaving > 0 ? 18 : 0) + (line.isDiscounted ? 18 : 0) + (line.devicePrice > 0 ? 18 : 0) + (line.protCost > 0 ? 18 : 0)
+                        : 70 + (line.perks.length > 0 ? 18 : 0);
+
+                    if (currentHeight + itemHeight > 980) pushPage(); // 980px is max safe height
+                    currentItems.push({ type: 'line', data: line });
+                    currentHeight += itemHeight;
+                });
+
+                if (multiDeviceProtection || accountAdjustments.length > 0) {
+                    let itemHeight = customerViewMode === 'detailed'
+                        ? 60 + (multiDeviceProtection ? 18 : 0) + (accountAdjustments.length * 18)
+                        : 60;
+                    if (currentHeight + itemHeight > 980) pushPage();
+                    currentItems.push({ type: 'account_services' });
+                    currentHeight += itemHeight;
+                }
+
+                if (oneTimeCredits.length > 0) {
+                    let itemHeight = customerViewMode === 'detailed'
+                        ? 60 + (oneTimeCredits.length * 18)
+                        : 60;
+                    if (currentHeight + itemHeight > 980) pushPage();
+                    currentItems.push({ type: 'otc' });
+                    currentHeight += itemHeight;
+                }
+
+                // Footer block needs about 180px
+                if (currentHeight + 180 > 980) pushPage();
+                currentItems.push({ type: 'footer' });
+                
+                pushPage(true); // Push the final page
+                return pages;
+            }, [calculations, customerViewMode]);
+
+            // --- 1:1 TRUE PDF CAPTURE LOGIC ---
+            const handleSavePdf = async () => {
+                setIsGeneratingPdf(true);
+                
+                // CRITICAL: Ensure all web fonts are fully loaded before capturing
+                await document.fonts.ready;
+                
+                // Store current scroll to restore later, and snap to top to prevent canvas offset bugs
+                const originalScrollY = window.scrollY;
+                window.scrollTo(0, 0);
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ format: 'letter', unit: 'pt' });
+                
+                // Create a temporary hidden workspace to render un-scaled clones
+                const hiddenWorkspace = document.createElement('div');
+                hiddenWorkspace.style.position = 'absolute';
+                hiddenWorkspace.style.top = '0px';
+                hiddenWorkspace.style.left = '-9999px'; // Hide off screen safely
+                document.body.appendChild(hiddenWorkspace);
+
+                try {
+                    for (let i = 0; i < paginatedContent.length; i++) {
+                        const pageNode = document.getElementById(`pdf-page-render-${i}`);
+                        const clone = pageNode.cloneNode(true);
+                        
+                        // Force 1:1 scale for perfect clarity, overriding any mobile shrinking
+                        clone.style.transform = 'none'; 
+                        clone.style.margin = '0';
+                        hiddenWorkspace.appendChild(clone);
+
+                        const canvas = await html2canvas(clone, { 
+                            scale: 2, // 2x Retina resolution capture
+                            useCORS: true,
+                            backgroundColor: '#ffffff',
+                            logging: false,
+                            windowWidth: 850 // Forces Tailwind to use desktop layout for the clone
+                        });
+                        
+                        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+                        
+                        if (i > 0) doc.addPage();
+                        // Paste perfectly scaled image into PDF bounds
+                        doc.addImage(imgData, 'JPEG', 0, 0, 612, 792);
+
+                        hiddenWorkspace.innerHTML = ''; // Clear for next page
+                    }
+                    
+                    const filename = `${customerName.trim() ? customerName.trim().split(' ')[0] + '_' : ''}Verizon_Quote.pdf`;
+                    doc.save(filename);
+                } catch (error) {
+                    console.error("PDF Generation Error:", error);
+                } finally {
+                    document.body.removeChild(hiddenWorkspace);
+                    window.scrollTo(0, originalScrollY); // Restore user position
+                    setIsGeneratingPdf(false);
+                }
+            };
+
+            const activeHardwareLine = lines.find(l => l.id === activeHardwareLineId);
+            const activePerkLine = lines.find(l => l.id === activePerkLineId);
+            const activeAdjLine = lines.find(l => l.id === activeAdjLineId);
+
+            return (
+                <div className="min-h-screen">
+                    {/* Only show nav if not currently in print preview mode */}
+                    {view !== 'print' && (
+                        <nav className="sticky top-0 z-50 px-4 md:px-6 py-4 border-b border-black/10 flex justify-between items-center bg-stone-100/80 backdrop-blur-md text-black">
+                            <div className="flex items-center">
+                                <span className="text-lg md:text-xl font-black tracking-tight">verizon</span>
+                                <span className="mx-2 md:mx-3 h-5 w-px bg-black/20"></span>
+                                <span className="text-lg md:text-xl font-light tracking-tight opacity-60">TCC</span>
+                            </div>
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <button onClick={handleShareLink} title={isCopied ? "Copied!" : "Copy Share Link"} className="p-2 md:p-2.5 rounded-full transition-all flex items-center justify-center shadow-sm border border-black/10 bg-white text-black hover:bg-black hover:text-white relative">
+                                    {isCopied ? <Icon name="Check" size={16} className="text-emerald-500" /> : <Icon name="Link" size={16}/>}
+                                </button>
+                                <button onClick={handlePrintPreview} title="Print Preview" className="p-2 md:p-2.5 rounded-full transition-all flex items-center justify-center shadow-sm border border-black/10 bg-white text-black hover:bg-black hover:text-white">
+                                    <Icon name="Printer" size={16}/>
+                                </button>
+                                <div className="flex gap-1 md:gap-2 p-1 bg-black/5 rounded-full">
+                                    <button onClick={() => setView('rep')} className={`px-2.5 md:px-6 py-1.5 md:py-2 rounded-full text-[10px] md:text-sm font-bold transition-all flex items-center gap-2 ${view === 'rep' ? 'bg-black text-white' : 'text-black/60 hover:text-black'}`}><Icon name="Settings" size={14} /> <span className="hidden sm:inline">Rep view</span><span className="sm:hidden">Rep</span></button>
+                                    <button onClick={() => setView('customer')} className={`px-2.5 md:px-6 py-1.5 md:py-2 rounded-full text-[10px] md:text-sm font-bold transition-all flex items-center gap-2 ${view === 'customer' ? 'bg-black text-white' : 'text-black/60 hover:text-black'}`}><Icon name="Eye" size={14} /> <span className="hidden sm:inline">Customer view</span><span className="sm:hidden">Cust</span></button>
+                                </div>
+                            </div>
+                        </nav>
+                    )}
+
+                    <main className={view === 'print' ? 'w-full' : 'max-w-[1340px] mx-auto p-4 md:p-6 mb-24 text-black'}>
+                        {view === 'rep' && (
+                            <div className="space-y-6">
+                                <header>
+                                    <h1 className="text-2xl md:text-3xl font-black leading-tight text-black">Quote builder.</h1>
+                                    <p className="text-xs md:text-sm opacity-60 font-medium text-black">Configure hardware and lines.</p>
+                                    
+                                    {!showNameField ? (
+                                        <button onClick={() => setShowNameField(true)} className="mt-2 text-[10px] font-bold uppercase tracking-widest text-black/40 hover:text-black flex items-center gap-1 transition-colors"><Icon name="Plus" size={12} /> Add customer name</button>
+                                    ) : (
+                                        <div className="mt-3 flex items-center gap-3 max-w-sm animate-in fade-in slide-in-from-left-2 duration-200">
+                                            <input value={customerName} onFocus={e => e.target.select()} onChange={e => setCustomerName(e.target.value)} placeholder="Customer Name" className="flex-grow bg-white border border-black/10 px-3 py-2 rounded-lg text-xs font-bold focus:border-black outline-none" />
+                                            <button onClick={() => { setShowNameField(false); setCustomerName(''); }} className="p-2 text-black/20 hover:text-verizon-red transition-colors"><Icon name="Trash2" size={16} /></button>
+                                        </div>
+                                    )}
+                                </header>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="bg-white p-5 border border-black/10 rounded-xl flex items-center justify-between shadow-sm">
+                                        <div><p className="font-bold text-sm">Multi-Device Protection</p><p className="text-[11px] opacity-50 font-medium">${calculations.vmpCost.toFixed(2)}/mo total</p></div>
+                                        <button onClick={() => setMultiDeviceProtection(!multiDeviceProtection)} className={`w-11 h-6 rounded-full relative transition-colors ${multiDeviceProtection ? 'bg-verizon-red' : 'bg-gray-300'}`}><div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${multiDeviceProtection ? 'right-1' : 'left-1'}`} /></button>
+                                    </div>
+                                    <button onClick={() => setShowAccountAdj(true)} className="bg-white p-5 border border-black/10 rounded-xl flex items-center justify-between shadow-sm hover:border-black transition-colors text-left">
+                                        <div><p className="font-bold text-sm">Account adjustments</p><p className="text-[11px] opacity-50 font-medium">{accountAdjustments.length} adjustment(s)</p></div>
+                                        <Icon name="PlusCircle" size={22} className="opacity-40" />
+                                    </button>
+                                    <button onClick={() => setShowOneTimeCreditsModal(true)} className="bg-white p-5 border border-black/10 rounded-xl flex items-center justify-between shadow-sm hover:border-black transition-colors text-left">
+                                        <div><p className="font-bold text-sm">One-time credits</p><p className="text-[11px] opacity-50 font-medium">{oneTimeCredits.length} credit(s)</p></div>
+                                        <Icon name="PlusCircle" size={22} className="opacity-40" />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {calculations.processedLines.map(line => (
+                                        <div key={line.id} className="bg-white border border-black/10 rounded-xl overflow-hidden shadow-sm">
+                                            <div className="p-4 md:p-5 flex flex-col lg:flex-row gap-6">
+                                                <div className="w-full lg:w-64 space-y-2 shrink-0">
+                                                    <div className="flex items-center gap-2">
+                                                        {editingLabelId === line.id ? (
+                                                            <input autoFocus value={line.label} className="text-xs font-bold border-b border-black outline-none bg-transparent w-full text-black" onBlur={() => setEditingLabelId(null)} onKeyDown={e => e.key === 'Enter' && setEditingLabelId(null)} onChange={e => updateLine(line.id, { label: e.target.value })} />
+                                                        ) : (
+                                                            <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setEditingLabelId(line.id)}><span className="text-xs font-bold opacity-60 group-hover:opacity-100">{line.label}</span><Icon name="Edit2" size={10} className="opacity-20" /></div>
+                                                        )}
+                                                    </div>
+                                                    <select value={line.type} onChange={e => updateLine(line.id, { type: e.target.value, perks: [] })} className="w-full px-3 py-2 bg-stone-50 border border-black/5 rounded-lg text-sm font-bold outline-none text-black">
+                                                        <option>Smartphone</option><option>Tablet</option><option>Watch</option><option>Home Internet</option><option>Custom</option>
+                                                    </select>
+                                                    {line.type === 'Custom' && <input value={line.customLineTypeLabel} onFocus={e => e.target.select()} onChange={e => updateLine(line.id, { customLineTypeLabel: e.target.value })} placeholder="Legacy Line Label" className="w-full bg-white border border-black/10 px-3 py-2 rounded-lg text-xs font-bold focus:border-black outline-none" />}
+                                                    {line.type !== 'Custom' && (
+                                                        <select value={line.planName} onChange={e => updateLine(line.id, { planName: e.target.value })} className="w-full px-3 py-2 bg-stone-50 border border-black/5 rounded-lg text-sm font-bold outline-none text-black">
+                                                            {line.type === 'Smartphone' && SMARTPHONE_PLANS.map(p => <option key={p.name}>{p.name}</option>)}
+                                                            {line.type === 'Tablet' && TABLET_PLANS.map(p => <option key={p.name}>{p.name}</option>)}
+                                                            {line.type === 'Watch' && WATCH_PLANS.map(p => <option key={p.name}>{p.name}</option>)}
+                                                            {line.type === 'Home Internet' && HOME_INTERNET_PLANS.map(p => <option key={p.name}>{p.name}</option>)}
+                                                        </select>
+                                                    )}
+                                                    {(line.planName === 'Custom' || line.type === 'Custom') && (
+                                                        <div className="mt-2 space-y-3 p-3 bg-stone-100 rounded-xl border border-black/5">
+                                                            <input value={line.customPlanName} onFocus={e => e.target.select()} onChange={e => updateLine(line.id, { customPlanName: e.target.value })} placeholder="Custom Plan Name" className="w-full bg-white border border-black/10 px-2 py-1.5 rounded-lg text-xs font-bold focus:border-black outline-none" />
+                                                            <div className="grid grid-cols-2 gap-2 text-black">
+                                                                <div className="space-y-0.5"><label className="text-[8px] font-bold uppercase opacity-40">Base Price</label><input type="number" inputMode="decimal" onWheel={e => e.currentTarget.blur()} value={line.customPlanPrice || ''} onFocus={e => e.target.select()} onChange={e => updateLine(line.id, { customPlanPrice: e.target.value })} placeholder="0.00" className="w-full bg-white border border-black/10 px-2 py-1.5 rounded-lg text-xs font-bold focus:border-black outline-none" /></div>
+                                                                <div className="space-y-0.5"><label className="text-[8px] font-bold uppercase opacity-40">AP Disc</label><input type="number" inputMode="decimal" onWheel={e => e.currentTarget.blur()} value={line.customAutopayDiscount || ''} onFocus={e => e.target.select()} onChange={e => updateLine(line.id, { customAutopayDiscount: e.target.value })} placeholder="0.00" className="w-full bg-white border border-black/10 px-2 py-1.5 rounded-lg text-xs font-bold focus:border-black outline-none" /></div>
+                                                            </div>
+                                                            {line.type === 'Smartphone' && (
+                                                                <div className="flex items-center justify-between text-[10px] font-bold opacity-60"><span>Slots:</span><div className="flex items-center gap-2 bg-white px-2 py-1 rounded-md border border-black/10"><button onClick={() => updateLine(line.id, { customDiscountSlots: Math.max(0, (parseInt(line.customDiscountSlots) || 0) - 1) })}>-</button><span className="font-black">{line.customDiscountSlots}</span><button onClick={() => updateLine(line.id, { customDiscountSlots: (parseInt(line.customDiscountSlots) || 0) + 1 })}>+</button></div></div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex-grow border-l border-black/5 pl-0 lg:pl-6 space-y-3 shrink-0 min-w-[280px]">
+                                                    <span className="text-[11px] font-bold text-black/40 block uppercase tracking-wider">Hardware</span>
+                                                    {line.type !== 'Home Internet' ? (
+                                                        <div className="flex flex-col md:flex-row gap-4 md:items-center">
+                                                            <button onClick={() => setActiveHardwareLineId(line.id)} className="hardware-btn w-full md:w-auto min-w-[220px] px-6 py-4 bg-stone-50 border border-black/5 rounded-xl hover:bg-black hover:text-white flex items-center gap-3 text-left shadow-sm active:scale-95 transition-all text-black"><Icon name="Smartphone" size={20} className="shrink-0" /><div className="flex flex-col"><span className="text-sm font-bold truncate max-w-[160px]">{line.deviceName || 'Select device'}</span><span className="text-[10px] opacity-60 font-medium">Configure</span></div></button>
+                                                            <div className="flex flex-col shrink-0"><span className="text-[10px] opacity-40 font-bold uppercase tracking-wider">Actual Payment</span><span className="text-xl font-black">${line.deviceMonthly.toFixed(2)}</span></div>
+                                                        </div>
+                                                    ) : <div className="h-full flex items-center text-black/20 italic text-sm">Not applicable</div>}
+                                                </div>
+
+                                                <div className="w-full lg:w-52 lg:shrink-0 flex flex-col gap-2 border-l border-black/5 pl-0 lg:pl-6">
+                                                    <span className="text-[11px] font-bold text-black/40 uppercase tracking-wider">Add-ons & Adjust</span>
+                                                    <button onClick={() => setActivePerkLineId(line.id)} className="flex items-center justify-between px-5 py-3 bg-yellow-100 border border-yellow-300 rounded-lg text-xs font-bold hover:bg-yellow-200 transition-colors text-left text-black"><span className="flex items-center gap-2"><Icon name="Gift" size={16}/> Perks ({line.perks.length})</span><Icon name="ChevronRight" size={16} /></button>
+                                                    <button onClick={() => setActiveAdjLineId(line.id)} className="flex items-center justify-between px-5 py-3 bg-stone-100 border border-stone-300 rounded-lg text-xs font-bold hover:bg-stone-200 transition-colors text-left text-black"><span className="flex items-center gap-2"><Icon name="PlusCircle" size={16}/> Adjust ({line.adjustments.length})</span><Icon name="ChevronRight" size={16} /></button>
+                                                    {!multiDeviceProtection && line.type !== 'Custom' && line.type !== 'Home Internet' && (
+                                                        <button onClick={() => updateLine(line.id, { individualProtection: !line.individualProtection })} className={`flex items-center gap-2 px-5 py-2.5 border rounded-lg text-xs font-bold transition-all ${line.individualProtection ? 'bg-black text-white' : 'bg-stone-50 text-black/60'}`}><Icon name="ShieldCheck" size={16} /> {line.individualProtection ? 'VMP protected' : 'Add protection'}</button>
+                                                    )}
+                                                    <button onClick={() => removeLine(line.id)} className="mt-auto flex items-center justify-center gap-2 px-5 py-2 text-xs font-bold text-verizon-red hover:bg-red-50 rounded-lg transition-colors"><Icon name="Trash2" size={16} /> Remove line</button>
+                                                </div>
+
+                                                <div className="w-full lg:w-36 lg:shrink-0 flex flex-col items-end justify-center border-l border-black/5 pl-0 lg:pl-6 bg-stone-50/50 -my-5 py-5 pr-5">
+                                                    <span className="text-[10px] font-bold text-black/40 uppercase tracking-widest text-right">Line total</span>
+                                                    <span className="text-2xl font-black">${line.totalLineCost.toFixed(2)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="flex flex-col md:flex-row gap-4 mt-8">
+                                    <button onClick={() => addLine('Smartphone')} className="flex-grow py-8 border-2 border-dashed border-black/10 rounded-2xl flex flex-col items-center justify-center gap-2 text-black/40 hover:text-verizon-red hover:border-red-200 transition-all group"><div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center group-hover:scale-110 transition-transform"><Icon name="Plus" size={24} /></div><span className="font-bold text-base">Add another line</span></button>
+                                    <button onClick={copyLastLine} className="px-10 py-8 border-2 border-dashed border-black/10 rounded-2xl flex flex-col items-center justify-center gap-2 text-black/40 hover:text-black hover:border-black/20 hover:bg-stone-50 transition-all group"><div className="w-10 h-10 rounded-full bg-black/5 flex items-center justify-center group-hover:scale-110 transition-transform"><Icon name="Copy" size={20} /></div><span className="font-bold text-sm opacity-60 group-hover:opacity-100">Copy last</span></button>
+                                </div>
+
+                                <div className="mt-12 mx-auto max-w-xl p-6 bg-black text-white rounded-[32px] shadow-2xl flex flex-col md:flex-row justify-between items-center gap-6">
+                                    <div className="flex-1 text-center md:text-left"><h3 className="text-stone-400 text-[10px] font-bold uppercase tracking-widest mb-1 opacity-60">Estimated Monthly Total</h3><div className="flex items-baseline justify-center md:justify-start gap-1"><span className="text-3xl md:text-4xl font-black tracking-tighter">${calculations.total.toFixed(2)}</span><span className="text-stone-400 text-xs font-bold opacity-40">/mo</span></div></div>
+                                    <div className="space-y-1 text-[11px] text-stone-400 font-medium text-center md:text-right border-t md:border-t-0 md:border-l border-white/10 pt-4 md:pt-0 md:pl-8"><p>Total lines: <span className="text-white font-bold">{lines.length}</span></p>{multiDeviceProtection && <p>Multi-Device: <span className="text-white font-bold">Included</span></p>}</div>
+                                    <button onClick={() => setView('customer')} className="w-full md:w-auto px-6 py-3.5 bg-verizon-red hover:bg-red-600 text-white rounded-xl font-black text-sm transition-all transform active:scale-95 flex items-center justify-center gap-2 shadow-lg">Generate Quote <Icon name="ChevronRight" size={18} /></button>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'customer' && (
+                            /* CUSTOMER VIEW */
+                            <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-6 duration-500 pb-20 text-black">
+                                <header className="text-center space-y-1">
+                                    <h1 className="text-2xl md:text-3xl font-black text-black tracking-tight leading-none">{customerName.trim() ? <>Hey {customerName.trim().split(' ')[0]},<br />Here's Your Verizon Quote.</> : "Your Verizon Quote."}</h1>
+                                    <p className="text-sm md:text-base text-black/60 font-medium italic opacity-70">Reliable, clear, and built for you.</p>
+                                </header>
+                                <div className="bg-white rounded-[40px] shadow-xl overflow-hidden border border-black/5">
+                                    <div className="bg-verizon-red p-8 md:p-10 text-white flex flex-col md:flex-row justify-between items-center text-center md:text-left gap-4">
+                                        <div className="flex-1 order-2 md:order-1"><h2 className="text-lg md:text-xl font-black mb-1">Monthly total</h2><p className="text-white/70 text-[11px] md:text-xs font-medium uppercase tracking-widest opacity-80">with Auto Pay & Paper-free billing</p></div>
+                                        <div className="text-right text-white order-1 md:order-2">
+                                            <div className="flex items-baseline justify-center md:justify-end gap-1"><span className="text-5xl md:text-6xl font-black tracking-tighter leading-none">${calculations.total.toFixed(2)}</span><span className="text-xl font-bold opacity-40">/mo</span></div>
+                                            <div className="flex flex-col items-center md:items-end mt-2"><p className="text-white text-[10px] uppercase tracking-widest font-bold opacity-60">+ Taxes & Surcharges</p><p className="text-white font-black text-[11px] uppercase tracking-widest opacity-100 mt-1">Estimated ${calculations.totalWithoutAutopay.toFixed(2)} without Auto Pay</p></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="p-6 md:p-8 space-y-8">
+                                        <div>
+                                            <h3 className="text-[10px] font-bold uppercase tracking-widest opacity-30 mb-6 border-b border-black/5 pb-2">Line Breakdown</h3>
+                                            <div className="space-y-8">
+                                                {calculations.processedLines.map(line => (
+                                                    <div key={line.id} className="flex flex-col md:flex-row gap-8 items-start">
+                                                        <div className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center shrink-0 border border-black/5"><Icon name={line.type === 'Smartphone' ? 'Smartphone' : line.type === 'Tablet' ? 'Tablet' : line.type === 'Watch' ? 'Watch' : 'Home'} size={24} className="opacity-60" /></div>
+                                                        <div className="flex-1 w-full text-black">
+                                                            <div className="flex justify-between items-start w-full">
+                                                                <div>
+                                                                    <h4 className="text-lg font-black leading-tight">{line.label}</h4>
+                                                                    {line.deviceName && <p className="text-sm font-medium mt-1 uppercase tracking-wide opacity-60">{line.deviceName}</p>}
+                                                                    {customerViewMode === 'detailed' ? (
+                                                                        <div className="mt-3 space-y-1 border-l-2 border-stone-100 pl-4 py-0.5">
+                                                                            <p className="text-sm font-medium opacity-50">${line.planBase.toFixed(2)} {line.displayName}</p>
+                                                                            {line.autopaySaving > 0 && <p className="text-sm text-emerald-600 font-bold">-${line.autopaySaving.toFixed(2)} Auto Pay & Paper-free Discount</p>}
+                                                                            {line.mhSaving > 0 && <p className="text-sm text-emerald-600 font-bold">-${line.mhSaving.toFixed(2)} Mobile + Home Discount</p>}
+                                                                            {line.isDiscounted && <p className="text-sm text-emerald-600 font-bold">-${line.connectedDiscountAmt.toFixed(2)} Connected Device Discount</p>}
+                                                                            {line.devicePrice > 0 && <p className="text-sm font-medium opacity-50">${line.deviceMonthly.toFixed(2)} Device Payment</p>}
+                                                                            {line.perks.map(pName => <p key={pName} className="text-sm font-medium opacity-50">${(PERKS.find(p => p.name === pName)?.cost || 10).toFixed(2)} {pName}</p>)}
+                                                                            {line.adjustments.map(adj => <p key={adj.id} className={`text-sm tracking-tight ${adj.type === 'credit' ? 'text-emerald-600 font-bold' : 'opacity-50'}`}>{adj.type === 'credit' ? '-' : ''}${parseFloat(adj.amount || 0).toFixed(2)} {adj.label}</p>)}
+                                                                            {line.protCost > 0 && <p className="text-sm font-medium opacity-50">${line.protCost}.00 Device protection</p>}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="mt-2 space-y-1">
+                                                                            <p className="text-xs font-medium opacity-50">{line.displayName}</p>
+                                                                            {line.perks.length > 0 && <p className="text-[11px] font-bold text-black/40 italic">Includes: {line.perks.join(', ')}</p>}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-right"><span className="font-black text-xl">${line.totalLineCost.toFixed(2)}</span></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {(multiDeviceProtection || accountAdjustments.length > 0) && (
+                                                    <div className="flex flex-col md:flex-row gap-8 items-start pt-6 border-t border-black/5 text-black">
+                                                        <div className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center shrink-0 border border-black/5 opacity-40"><Icon name="ShieldCheck" size={24} /></div>
+                                                        <div className="flex-1 w-full text-black">
+                                                            <div className="flex justify-between items-start w-full">
+                                                                <div>
+                                                                    <h4 className="text-lg font-black leading-tight">Account services</h4>
+                                                                    {customerViewMode === 'detailed' ? (
+                                                                        <div className="mt-3 space-y-1 border-l-2 border-stone-100 pl-4">
+                                                                            {multiDeviceProtection && <p className="text-sm font-medium opacity-50">${calculations.vmpCost.toFixed(2)} Multi-Device Protection</p>}
+                                                                            {accountAdjustments.map(adj => <p key={adj.id} className={`text-sm tracking-tight ${adj.type === 'credit' ? 'text-emerald-600 font-bold' : 'opacity-50'}`}>{adj.type === 'credit' ? '-' : ''}${parseFloat(adj.amount || 0).toFixed(2)} {adj.label}</p>)}
+                                                                        </div>
+                                                                    ) : <p className="text-xs font-medium opacity-50 mt-1 italic">Protection & Adjustments Applied</p>}
+                                                                </div>
+                                                                <div className="text-right"><span className="font-black text-xl">${(calculations.vmpCost + calculations.accAdjSum).toFixed(2)}</span></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {oneTimeCredits.length > 0 && (
+                                                    <div className="flex flex-col md:flex-row gap-8 items-start pt-6 border-t border-black/5 text-black">
+                                                        <div className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center shrink-0 border border-black/5 opacity-40"><Icon name="Gift" size={24} /></div>
+                                                        <div className="flex-1 w-full text-black">
+                                                            <div className="flex justify-between items-start w-full">
+                                                                <div>
+                                                                    <h4 className="text-lg font-black leading-tight">One-time credits</h4>
+                                                                    {customerViewMode === 'detailed' ? (
+                                                                        <div className="mt-3 space-y-1 border-l-2 border-stone-100 pl-4">
+                                                                            {oneTimeCredits.map(credit => (
+                                                                                <p key={credit.id} className="text-sm tracking-tight text-emerald-600 font-bold">
+                                                                                    -${parseFloat(credit.amount || 0).toFixed(2)} {credit.label || 'Credit'}
+                                                                                </p>
+                                                                            ))}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <p className="text-xs font-medium opacity-50 mt-1 italic">One-time credits applied</p>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-right"><span className="font-black text-xl text-emerald-600">-${calculations.totalOneTimeCredits.toFixed(2)}</span></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-row justify-between items-end gap-4 mt-8">
+                                            <div className="flex gap-1 p-1 bg-black/5 rounded-xl h-fit">
+                                                <button onClick={() => setCustomerViewMode('detailed')} className={`px-3 md:px-4 py-1.5 rounded-lg text-[9px] md:text-[10px] font-bold uppercase transition-all ${customerViewMode === 'detailed' ? 'bg-black text-white shadow-sm' : 'text-black/40 hover:text-black'}`}>Detailed</button>
+                                                <button onClick={() => setCustomerViewMode('simple')} className={`px-3 md:px-4 py-1.5 rounded-lg text-[9px] md:text-[10px] font-bold uppercase transition-all ${customerViewMode === 'simple' ? 'bg-black text-white shadow-sm' : 'text-black/40 hover:text-black'}`}>Simple</button>
+                                            </div>
+
+                                            <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+                                                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-emerald-950 shadow-sm max-w-[180px] md:max-w-xs">
+                                                    <div className="w-7 h-7 bg-emerald-500 rounded-lg flex items-center justify-center shrink-0 text-white"><Icon name="Smartphone" size={14} /></div>
+                                                    <div className="text-right"><p className="text-[9px] md:text-[10px] font-black uppercase opacity-60 leading-none mb-0.5">Device Savings</p><span className="text-xl md:text-2xl font-black text-emerald-600 tracking-tighter leading-none">${calculations.totalFullDeviceSavings.toFixed(2)}</span></div>
+                                                </div>
+                                                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-emerald-950 shadow-sm max-w-[180px] md:max-w-xs">
+                                                    <div className="w-7 h-7 bg-emerald-500 rounded-lg flex items-center justify-center shrink-0 text-white"><Icon name="DollarSign" size={16} /></div>
+                                                    <div className="text-right"><p className="text-[9px] md:text-[10px] font-black uppercase opacity-60 leading-none mb-0.5">Monthly Savings</p><span className="text-xl md:text-2xl font-black text-emerald-600 tracking-tighter leading-none">${calculations.totalMonthlySavings.toFixed(2)}</span></div>
+                                                </div>
+                                                {calculations.totalOneTimeCredits > 0 && (
+                                                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-emerald-950 shadow-sm max-w-[180px] md:max-w-xs">
+                                                        <div className="w-7 h-7 bg-emerald-500 rounded-lg flex items-center justify-center shrink-0 text-white"><Icon name="Gift" size={16} /></div>
+                                                        <div className="text-right"><p className="text-[9px] md:text-[10px] font-black uppercase opacity-60 leading-none mb-0.5">One-Time Credits</p><span className="text-xl md:text-2xl font-black text-emerald-600 tracking-tighter leading-none">${calculations.totalOneTimeCredits.toFixed(2)}</span></div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="p-8 bg-stone-50 border-t border-black/5 flex items-start gap-2"><span className="text-[10px] font-medium opacity-40 shrink-0 mt-0.5">*</span><p className="text-[10px] font-medium leading-relaxed opacity-40 italic">Estimate only. Taxes, surcharges, and activation fees not included. Promotions may change. Quote guaranteed for today.</p></div>
+                                </div>
+                                <div className="text-center"><button onClick={() => setView('rep')} className="text-black font-bold text-[10px] uppercase tracking-widest opacity-20 hover:opacity-60 transition-all">Back to builder</button></div>
+                            </div>
+                        )}
+
+                        {view === 'print' && (
+                            /* TRUE REACT HTML PAGINATION - 1:1 PDF PARITY */
+                            <div className="w-full flex flex-col items-center bg-stone-200/80 pt-4 md:pt-8 pb-24 min-h-screen gap-8 overflow-x-hidden">
+                                
+                                {paginatedContent.map((page, index) => (
+                                    <div key={index} style={{ width: 850 * scale, height: 1100 * scale }} className="relative shadow-2xl bg-white border border-black/10 transition-all duration-300 shrink-0">
+                                        <div id={`pdf-page-render-${index}`} style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: 850, height: 1100 }} className="absolute top-0 left-0 bg-white pt-[50px] px-[50px] pb-[40px] text-black">
+                                            
+                                            {/* HEADER (Only on Page 1) */}
+                                            {page.isFirst && (
+                                                <>
+                                                    <header className="text-center space-y-2 mb-10">
+                                                        <h1 className="text-3xl font-black text-black tracking-tight leading-none">{customerName.trim() ? <>Hey {customerName.trim().split(' ')[0]},<br />Here's Your Verizon Quote.</> : "Your Verizon Quote."}</h1>
+                                                        <p className="text-sm text-black/60 font-medium italic">Reliable, clear, and built for you.</p>
+                                                    </header>
+
+                                                    <div className="border-b-4 border-black pb-6 flex justify-between items-end mb-8">
+                                                        <div>
+                                                            <h2 className="text-xl font-black mb-1">Monthly total</h2>
+                                                            <p className="text-black/70 text-xs font-medium uppercase tracking-widest">with Auto Pay & Paper-free billing</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="flex items-baseline justify-end gap-1 mb-1">
+                                                                <span className="text-[52px] font-black tracking-tight leading-[1]">${calculations.total.toFixed(2)}</span>
+                                                                <span className="text-lg font-bold opacity-60">/mo</span>
+                                                            </div>
+                                                            <div className="flex flex-col items-end mt-4">
+                                                                <p className="text-[10px] uppercase tracking-widest font-bold opacity-60 pt-1">+ Taxes & Surcharges</p>
+                                                                <p className="font-black text-[11px] uppercase tracking-widest mt-1">Estimated ${calculations.totalWithoutAutopay.toFixed(2)} without Auto Pay</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <h3 className="text-xs font-bold uppercase tracking-widest opacity-60 mb-4 border-b border-black/20 pb-2">Line Breakdown</h3>
+                                                </>
+                                            )}
+
+                                            {/* PAGE ITEMS (Lines, Acc Services, OTC, Footer) */}
+                                            <div className="space-y-4">
+                                                {page.items.map((item, i) => {
+                                                    if (item.type === 'line') {
+                                                        const line = item.data;
+                                                        return (
+                                                            <div key={line.id} className="flex gap-4 items-start mb-4">
+                                                                <div className="w-8 h-8 flex items-center justify-center shrink-0">
+                                                                    <Icon name={line.type === 'Smartphone' ? 'Smartphone' : line.type === 'Tablet' ? 'Tablet' : line.type === 'Watch' ? 'Watch' : 'Home'} size={24} className="opacity-60" />
+                                                                </div>
+                                                                <div className="flex-1 border-b border-black/5 pb-4">
+                                                                    <div className="flex justify-between items-start">
+                                                                        <div>
+                                                                            <h4 className="text-sm font-black leading-tight">{line.label}</h4>
+                                                                            {line.deviceName && <p className="text-[11px] font-medium uppercase tracking-wide opacity-80">{line.deviceName}</p>}
+                                                                            {customerViewMode === 'detailed' ? (
+                                                                                <div className="mt-1.5 space-y-0.5 border-l-2 border-black/10 pl-3 py-0.5">
+                                                                                    <p className="text-xs font-medium opacity-80">${line.planBase.toFixed(2)} {line.displayName}</p>
+                                                                                    {line.autopaySaving > 0 && <p className="text-xs text-black font-semibold opacity-80">-${line.autopaySaving.toFixed(2)} Auto Pay & Paper-free Discount</p>}
+                                                                                    {line.mhSaving > 0 && <p className="text-xs text-black font-semibold opacity-80">-${line.mhSaving.toFixed(2)} Mobile + Home Discount</p>}
+                                                                                    {line.isDiscounted && <p className="text-xs text-black font-semibold opacity-80">-${line.connectedDiscountAmt.toFixed(2)} Connected Device Discount</p>}
+                                                                                    {line.devicePrice > 0 && <p className="text-xs font-medium opacity-80">${line.deviceMonthly.toFixed(2)} Device Payment</p>}
+                                                                                    {line.perks.map(pName => <p key={pName} className="text-xs font-medium opacity-80">${(PERKS.find(p => p.name === pName)?.cost || 10).toFixed(2)} {pName}</p>)}
+                                                                                    {line.adjustments.map(adj => <p key={adj.id} className={`text-xs tracking-tight ${adj.type === 'credit' ? 'text-black font-semibold opacity-80' : 'opacity-80'}`}>{adj.type === 'credit' ? '-' : ''}${parseFloat(adj.amount || 0).toFixed(2)} {adj.label}</p>)}
+                                                                                    {line.protCost > 0 && <p className="text-xs font-medium opacity-80">${line.protCost}.00 Device protection</p>}
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="mt-1 space-y-0.5">
+                                                                                    <p className="text-[10px] font-medium opacity-80">{line.displayName}</p>
+                                                                                    {line.perks.length > 0 && <p className="text-[9px] font-bold text-black/60 italic">Includes: {line.perks.join(', ')}</p>}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="text-right">
+                                                                            <span className="font-black text-base">${line.totalLineCost.toFixed(2)}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    
+                                                    if (item.type === 'account_services') {
+                                                        return (
+                                                            <div key={`acc-serv-${i}`} className="flex gap-4 items-start pt-2 mb-4">
+                                                                <div className="w-8 h-8 flex items-center justify-center shrink-0 opacity-60">
+                                                                    <Icon name="ShieldCheck" size={24}/>
+                                                                </div>
+                                                                <div className="flex-1 border-b border-black/5 pb-4">
+                                                                    <div className="flex justify-between items-start">
+                                                                        <div>
+                                                                            <h4 className="text-sm font-black leading-tight">Account services</h4>
+                                                                            {customerViewMode === 'detailed' ? (
+                                                                                <div className="mt-1.5 space-y-0.5 border-l-2 border-black/10 pl-3 py-0.5">
+                                                                                    {multiDeviceProtection && <p className="text-xs font-medium opacity-80">${calculations.vmpCost.toFixed(2)} Multi-Device Protection</p>}
+                                                                                    {accountAdjustments.map(adj => <p key={adj.id} className={`text-xs tracking-tight ${adj.type === 'credit' ? 'text-black font-semibold opacity-80' : 'opacity-80'}`}>{adj.type === 'credit' ? '-' : ''}${parseFloat(adj.amount || 0).toFixed(2)} {adj.label}</p>)}
+                                                                                </div>
+                                                                            ) : <p className="text-[10px] font-medium opacity-80 mt-0.5 italic">Protection & Adjustments Applied</p>}
+                                                                        </div>
+                                                                        <div className="text-right"><span className="font-black text-base">${(calculations.vmpCost + calculations.accAdjSum).toFixed(2)}</span></div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    if (item.type === 'otc') {
+                                                        return (
+                                                            <div key={`otc-${i}`} className="flex gap-4 items-start pt-2 mb-4">
+                                                                <div className="w-8 h-8 flex items-center justify-center shrink-0 opacity-60">
+                                                                    <Icon name="Gift" size={24}/>
+                                                                </div>
+                                                                <div className="flex-1 border-b border-black/5 pb-4">
+                                                                    <div className="flex justify-between items-start">
+                                                                        <div>
+                                                                            <h4 className="text-sm font-black leading-tight">One-time credits</h4>
+                                                                            {customerViewMode === 'detailed' ? (
+                                                                                <div className="mt-1.5 space-y-0.5 border-l-2 border-black/10 pl-3 py-0.5">
+                                                                                    {oneTimeCredits.map(credit => (
+                                                                                        <p key={credit.id} className="text-xs tracking-tight text-black font-semibold opacity-80">
+                                                                                            -${parseFloat(credit.amount || 0).toFixed(2)} {credit.label || 'Credit'}
+                                                                                        </p>
+                                                                                    ))}
+                                                                                </div>
+                                                                            ) : (
+                                                                                <p className="text-[10px] font-medium opacity-80 mt-0.5 italic">One-time credits applied</p>
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="text-right"><span className="font-black text-base text-black">-${calculations.totalOneTimeCredits.toFixed(2)}</span></div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    if (item.type === 'footer') {
+                                                        return (
+                                                            <div key={`footer-${i}`}>
+                                                                <div className="flex justify-end gap-6 pt-4 border-t border-black/20">
+                                                                    <div className="text-right">
+                                                                        <p className="text-[9px] font-black uppercase opacity-60 leading-none mb-1 text-black">Device Savings</p>
+                                                                        <span className="text-lg font-black text-black tracking-tighter leading-none">${calculations.totalFullDeviceSavings.toFixed(2)}</span>
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <p className="text-[9px] font-black uppercase opacity-60 leading-none mb-1 text-black">Monthly Savings</p>
+                                                                        <span className="text-lg font-black text-black tracking-tighter leading-none">${calculations.totalMonthlySavings.toFixed(2)}</span>
+                                                                    </div>
+                                                                    {calculations.totalOneTimeCredits > 0 && (
+                                                                        <div className="text-right">
+                                                                            <p className="text-[9px] font-black uppercase opacity-60 leading-none mb-1 text-black">One-Time Credits</p>
+                                                                            <span className="text-lg font-black text-black tracking-tighter leading-none">-${calculations.totalOneTimeCredits.toFixed(2)}</span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                
+                                                                <div className="mt-12 flex items-start gap-2 opacity-60 border-t border-black/10 pt-4">
+                                                                    <span className="text-[9px] font-medium shrink-0 mt-0.5">*</span>
+                                                                    <p className="text-[9px] font-medium leading-relaxed italic">Estimate only. Taxes, surcharges, and activation fees not included. Promotions may change. Quote guaranteed for today.</p>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })}
+                                            </div>
+
+                                            {/* Baked in page number logic for the preview */}
+                                            <div className="absolute bottom-6 right-10 text-xs font-bold text-black/40">
+                                                Page {index + 1} of {paginatedContent.length}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {/* Bottom Action Buttons */}
+                                <div className="mt-4 flex flex-col items-center gap-4 relative z-10">
+                                    <button onClick={handleSavePdf} disabled={isGeneratingPdf} className="px-8 py-4 bg-black hover:bg-stone-800 text-white rounded-xl font-black text-lg transition-all shadow-xl flex items-center gap-3">
+                                        {isGeneratingPdf ? <Icon name="Loader2" size={20} className="animate-spin" /> : <Icon name="Download" size={20}/>}
+                                        {isGeneratingPdf ? 'Generating PDF...' : 'Save as PDF'}
+                                    </button>
+                                    <button onClick={() => setView('customer')} className="text-black font-bold text-xs uppercase tracking-widest opacity-40 hover:opacity-100 transition-all flex items-center gap-2 mb-8">
+                                        <Icon name="ArrowLeft" size={14}/> Back to quote
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Modals remain exactly as before */}
+                    {activeHardwareLineId && activeHardwareLine && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setActiveHardwareLineId(null)}>
+                            <div className="relative w-full max-w-md bg-white rounded-[32px] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <div className="p-8 border-b border-black/5 bg-stone-50 flex justify-between items-center"><h2 className="text-xl font-black leading-none">Hardware settings.</h2><button onClick={() => setActiveHardwareLineId(null)} className="p-2 hover:bg-black/5 rounded-full"><Icon name="X" size={24}/></button></div>
+                                <div className="p-8 space-y-6">
+                                    <div className="space-y-2"><label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Device name</label><input value={activeHardwareLine.deviceName} onFocus={e => e.target.select()} onChange={e => updateLine(activeHardwareLineId, { deviceName: e.target.value })} placeholder="e.g. iPhone 16 Pro" className="w-full px-5 py-4 bg-stone-50 border border-black/10 rounded-2xl outline-none font-bold text-lg focus:border-black text-black" /></div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-3"><label className="text-[11px] font-bold uppercase tracking-widest opacity-40">Retail price</label><input type="number" inputMode="decimal" onWheel={e => e.currentTarget.blur()} value={activeHardwareLine.devicePrice || ''} onFocus={e => e.target.select()} onChange={e => updateLine(activeHardwareLineId, { devicePrice: parseFloat(e.target.value) || 0 })} placeholder="0.00" className="w-full px-6 py-5 bg-stone-50 border border-black/10 rounded-2xl font-bold text-lg outline-none focus:border-black text-black" /></div>
+                                        <div className="space-y-3 text-black"><label className="text-[11px] font-bold uppercase tracking-widest text-verizon-red">Promo credit</label><input type="number" inputMode="decimal" onWheel={e => e.currentTarget.blur()} value={activeHardwareLine.promoCredit || ''} onFocus={e => e.target.select()} onChange={e => updateLine(activeHardwareLineId, { promoCredit: parseFloat(e.target.value) || 0 })} placeholder="0.00" className="w-full px-6 py-5 bg-stone-50 border border-black/10 rounded-2xl font-bold text-lg text-verizon-red outline-none focus:border-red-500 text-black" /></div>
+                                    </div>
+                                    <div className="p-8 bg-black text-white rounded-[28px] flex justify-between items-center shadow-xl text-white"><div><p className="text-[11px] font-bold opacity-60">Net monthly</p><p className="text-4xl font-black tracking-tight">${((activeHardwareLine.devicePrice - activeHardwareLine.promoCredit)/36).toFixed(2)}</p></div><div className="text-right text-xs font-bold opacity-60 uppercase tracking-widest">36 Months</div></div>
+                                </div>
+                                <div className="p-8 border-t border-black/5 text-black"><button onClick={() => setActiveHardwareLineId(null)} className="w-full py-6 bg-black text-white rounded-2xl font-black text-xl hover:scale-[1.01] active:scale-95 transition-all shadow-lg text-white">Done</button></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {(activeAdjLineId || showAccountAdj) && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => { setActiveAdjLineId(null); setShowAccountAdj(false); }}>
+                            <div className="relative w-full max-w-lg bg-white rounded-[40px] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <div className="p-10 border-b border-black/5 bg-stone-50 flex justify-between items-center"><h2 className="text-2xl font-black">{showAccountAdj ? 'Account Adjustments' : 'Line Adjustments'}</h2><button onClick={() => { setActiveAdjLineId(null); setShowAccountAdj(false); }} className="p-3 hover:bg-black/5 rounded-full"><Icon name="X" size={28}/></button></div>
+                                <div className="p-10 space-y-6 max-h-[60vh] overflow-y-auto">
+                                    {(showAccountAdj ? accountAdjustments : lines.find(l => l.id === activeAdjLineId)?.adjustments || []).map((adj, i) => (
+                                        <div key={adj.id} className="flex flex-col gap-4 bg-stone-50 p-6 rounded-3xl border border-black/5 text-black">
+                                            <div className="flex gap-2 p-1 bg-black/5 rounded-xl self-start"><button onClick={() => showAccountAdj ? setAccountAdjustments(prev => prev.map((a, idx) => idx === i ? {...a, type: 'credit'} : a)) : setLines(prev => prev.map(l => l.id === activeAdjLineId ? {...l, adjustments: l.adjustments.map((a, idx) => idx === i ? {...a, type: 'credit'} : a)} : l))} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${adj.type === 'credit' ? 'bg-emerald-500 text-white shadow-sm' : 'text-black/40 hover:text-black'}`}>Credit</button><button onClick={() => showAccountAdj ? setAccountAdjustments(prev => prev.map((a, idx) => idx === i ? {...a, type: 'charge'} : a)) : setLines(prev => prev.map(l => l.id === activeAdjLineId ? {...l, adjustments: l.adjustments.map((a, idx) => idx === i ? {...a, type: 'charge'} : a)} : l))} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${adj.type === 'charge' ? 'bg-black text-white shadow-sm' : 'text-black/40 hover:text-black'}`}>Charge</button></div>
+                                            <div className="flex gap-4 items-end text-black"><div className="flex-grow space-y-1"><label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Label</label><input value={adj.label} onFocus={e => e.target.select()} placeholder="Adjustment Label" onChange={e => showAccountAdj ? setAccountAdjustments(prev => prev.map((a, idx) => idx === i ? {...a, label: e.target.value} : a)) : setLines(prev => prev.map(l => l.id === activeAdjLineId ? {...l, adjustments: l.adjustments.map((a, idx) => idx === i ? {...a, label: e.target.value} : a)} : l))} className="w-full bg-white border border-black/10 px-4 py-3 rounded-xl text-sm font-bold focus:border-black outline-none text-black" /></div><div className="w-28 space-y-1"><label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Amount</label><input type="number" inputMode="decimal" value={adj.amount} onWheel={e => e.currentTarget.blur()} onFocus={e => e.target.select()} placeholder="0.00" onChange={e => showAccountAdj ? setAccountAdjustments(prev => prev.map((a, idx) => idx === i ? {...a, amount: e.target.value} : a)) : setLines(prev => prev.map(l => l.id === activeAdjLineId ? {...l, adjustments: l.adjustments.map((a, idx) => idx === i ? {...a, amount: e.target.value} : a)} : l))} className="w-full bg-white border border-black/10 px-4 py-3 rounded-xl text-sm font-bold focus:border-black outline-none text-black" /></div><button onClick={() => showAccountAdj ? setAccountAdjustments(prev => prev.filter((_, idx) => idx !== i)) : setLines(prev => prev.map(l => l.id === activeAdjLineId ? {...l, adjustments: l.adjustments.filter((_, idx) => idx !== i)} : l))} className="p-3 text-verizon-red hover:bg-red-50 rounded-lg transition-colors"><Icon name="Trash2" size={20}/></button></div>
+                                        </div>
+                                    ))}
+                                    <button onClick={() => { const newAdj = { id: Math.random().toString(36).substr(2, 9), label: '', amount: '', type: 'credit' }; if (showAccountAdj) setAccountAdjustments(prev => [...prev, newAdj]); else setLines(prev => prev.map(l => l.id === activeAdjLineId ? {...l, adjustments: [...l.adjustments, newAdj]} : l)); }} className="w-full py-6 border-2 border-dashed border-black/10 rounded-2xl text-black/40 hover:text-black font-bold flex items-center justify-center gap-3 transition-all text-base uppercase"><Icon name="PlusCircle" size={20}/> Add adjustment</button>
+                                </div>
+                                <div className="p-8 border-t border-black/5 text-black"><button onClick={() => { setActiveAdjLineId(null); setShowAccountAdj(false); }} className="w-full py-6 bg-black text-white rounded-2xl font-black text-xl hover:scale-[1.01] active:scale-95 transition-all shadow-md text-white">Done</button></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activePerkLineId && lines.find(l => l.id === activePerkLineId) && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setActivePerkLineId(null)}>
+                            <div className="relative w-full max-w-2xl bg-white rounded-[40px] overflow-hidden shadow-2xl text-black" onClick={e => e.stopPropagation()}>
+                                <div className="p-10 border-b border-black/5 bg-stone-50 flex justify-between items-center"><h2 className="text-xl font-black">Select perks.</h2><button onClick={() => setActivePerkLineId(null)} className="p-3 hover:bg-black/5 rounded-full transition-colors text-black"><Icon name="X" size={28}/></button></div>
+                                <div className="p-10 max-h-[50vh] overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    {PERKS.map(perk => {
+                                        const line = lines.find(l => l.id === activePerkLineId);
+                                        const isSel = line?.perks.includes(perk.name);
+                                        return (
+                                            <button key={perk.name} onClick={() => togglePerk(activePerkLineId, perk.name)} className={`flex items-center justify-between p-6 rounded-3xl border-2 transition-all ${isSel ? 'border-black bg-black text-white shadow-md' : 'border-black/5 text-black hover:border-black/20 hover:bg-stone-50'}`}><div className="flex flex-col text-left"><span className={`font-bold text-lg leading-tight ${isSel ? 'text-white' : 'text-black'}`}>{perk.name}</span><span className={`text-xs font-medium mt-1 ${isSel ? 'text-white/60' : 'text-black/40'}`}>{`$${perk.cost.toFixed(2)}/mo`}</span></div>{isSel && <Icon name="CheckCircle2" size={24} className="text-yellow-300" />}</button>
+                                        );
+                                    })}
+                                </div>
+                                <div className="p-8 border-t border-black/5 flex justify-between items-center text-black bg-stone-50"><div><p className="text-[10px] font-bold opacity-40 uppercase tracking-widest">Total Perks</p><p className="text-3xl font-black text-black">${lines.find(l => l.id === activePerkLineId)?.perks.reduce((acc, pName) => acc + (PERKS.find(p => p.name === pName)?.cost || 0), 0).toFixed(2)}/mo</p></div><button onClick={() => setActivePerkLineId(null)} className="px-14 py-5 bg-verizon-red text-white rounded-2xl font-black text-xl shadow-lg hover:scale-[1.01] active:scale-95 transition-all text-white">Save perks</button></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showOneTimeCreditsModal && (
+                        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowOneTimeCreditsModal(false)}>
+                            <div className="relative w-full max-w-lg bg-white rounded-[40px] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <div className="p-10 border-b border-black/5 bg-stone-50 flex justify-between items-center"><h2 className="text-2xl font-black">One-Time Credits</h2><button onClick={() => setShowOneTimeCreditsModal(false)} className="p-3 hover:bg-black/5 rounded-full"><Icon name="X" size={28}/></button></div>
+                                <div className="p-10 space-y-6 max-h-[60vh] overflow-y-auto">
+                                    {oneTimeCredits.map((credit, i) => (
+                                        <div key={credit.id} className="flex gap-4 items-end bg-stone-50 p-6 rounded-3xl border border-black/5 text-black">
+                                            <div className="flex-grow space-y-1"><label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Label</label><input value={credit.label} onFocus={e => e.target.select()} placeholder="Credit Label" onChange={e => setOneTimeCredits(prev => prev.map((c, idx) => idx === i ? {...c, label: e.target.value} : c))} className="w-full bg-white border border-black/10 px-4 py-3 rounded-xl text-sm font-bold focus:border-black outline-none text-black" /></div>
+                                            <div className="w-28 space-y-1"><label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Amount</label><input type="number" inputMode="decimal" value={credit.amount} onWheel={e => e.currentTarget.blur()} onFocus={e => e.target.select()} placeholder="0.00" onChange={e => setOneTimeCredits(prev => prev.map((c, idx) => idx === i ? {...c, amount: e.target.value} : c))} className="w-full bg-white border border-black/10 px-4 py-3 rounded-xl text-sm font-bold focus:border-black outline-none text-black" /></div>
+                                            <button onClick={() => setOneTimeCredits(prev => prev.filter((_, idx) => idx !== i))} className="p-3 text-verizon-red hover:bg-red-50 rounded-lg transition-colors"><Icon name="Trash2" size={20}/></button>
+                                        </div>
+                                    ))}
+                                    <button onClick={() => setOneTimeCredits(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), label: '', amount: '' }])} className="w-full py-6 border-2 border-dashed border-black/10 rounded-2xl text-black/40 hover:text-black font-bold flex items-center justify-center gap-3 transition-all text-base uppercase"><Icon name="PlusCircle" size={20}/> Add one-time credit</button>
+                                </div>
+                                <div className="p-8 border-t border-black/5 text-black"><button onClick={() => setShowOneTimeCreditsModal(false)} className="w-full py-6 bg-black text-white rounded-2xl font-black text-xl hover:scale-[1.01] active:scale-95 transition-all shadow-md text-white">Done</button></div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById("root"));
+        root.render(<App />);
+    </script>
+</body>
+</html>
