@@ -297,14 +297,14 @@ const App = ({ config }) => {
             {/* Only show nav if not currently in print preview mode */}
             {view !== 'print' && (
                 <nav className="sticky top-0 z-50 px-4 md:px-6 py-4 border-b border-black/10 flex justify-between items-center bg-stone-100/80 backdrop-blur-md text-black">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <button onClick={() => setIsMenuOpen(true)} title="Open menu" className="p-1.5 transition-colors flex items-center justify-center text-black/60 hover:text-black">
                             <Icon name="Menu" size={18} />
                         </button>
                         <span className="h-5 w-px bg-black/20"></span>
-                        <span className="text-lg md:text-xl font-black tracking-tight">verizon</span>
-                        <span className="mx-2 md:mx-3 h-5 w-px bg-black/20"></span>
-                        <span className="text-lg md:text-xl font-light tracking-tight opacity-60">TCC</span>
+                        <span className="text-base md:text-lg font-black tracking-tight">verizon</span>
+                        <span className="h-5 w-px bg-black/20"></span>
+                        <span className="text-base md:text-lg font-light tracking-tight opacity-60">TCC</span>
                     </div>
                     <div className="flex items-center gap-2 md:gap-3">
                         <button onClick={handleShareLink} title={isCopied ? "Copied!" : "Copy Share Link"} className="p-2 md:p-2.5 rounded-full transition-all flex items-center justify-center shadow-sm border border-black/10 bg-white text-black hover:bg-black hover:text-white relative">
