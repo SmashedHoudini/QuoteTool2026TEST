@@ -55,6 +55,13 @@
         requiredNumber(settings.financingMonths, 'quoteSettings.financingMonths');
         requiredNumber(settings.connectedDeviceDiscountRate, 'quoteSettings.connectedDeviceDiscountRate');
 
+        const taxSettings = requiredObject(settings['taxes&surcharges'], 'quoteSettings.taxes&surcharges');
+        requiredNumber(taxSettings.Smartphone, 'quoteSettings.taxes&surcharges.Smartphone');
+        requiredNumber(taxSettings.Tablet, 'quoteSettings.taxes&surcharges.Tablet');
+        requiredNumber(taxSettings.Watch, 'quoteSettings.taxes&surcharges.Watch');
+        requiredNumber(taxSettings['Home Internet'], 'quoteSettings.taxes&surcharges.Home Internet');
+        requiredNumber(taxSettings.Custom, 'quoteSettings.taxes&surcharges.Custom');
+
         const individualProtection = requiredObject(settings.individualProtection, 'quoteSettings.individualProtection');
         requiredNumber(individualProtection.Smartphone, 'quoteSettings.individualProtection.Smartphone');
         requiredNumber(individualProtection.Watch, 'quoteSettings.individualProtection.Watch');
@@ -82,7 +89,12 @@
         return acc + (adjustment.type === 'credit' ? -amount : amount);
     }, 0);
 
-    const calculateQuote = ({ lines, multiDeviceProtection, accountAdjustments, oneTimeCredits }, config) => {
+    const getTaxSurchargeForLine = (line, taxSettings) => {
+        if (line.type === 'Custom') return parseAmount(line.customTaxSurcharge ?? taxSettings.Custom);
+        return parseAmount(taxSettings[line.type]);
+    };
+
+    const calculateQuote = ({ lines, multiDeviceProtection, accountAdjustments, oneTimeCredits, includeEstimatedTaxes }, config) => {
         const SMARTPHONE_PLANS = config.smartphonePlans;
         const TABLET_PLANS = config.tabletPlans;
         const WATCH_PLANS = config.watchPlans;
@@ -91,6 +103,7 @@
         const settings = config.quoteSettings;
         const financingMonths = settings.financingMonths;
         const connectedDeviceDiscountRate = settings.connectedDeviceDiscountRate;
+        const taxSettings = settings['taxes&surcharges'];
         const individualProtection = settings.individualProtection;
         const multiProtection = settings.multiDeviceProtection;
 
@@ -147,12 +160,17 @@
             const adjSum = sumAdjustments(line.adjustments);
 
             let protCost = 0;
-            if (!multiDeviceProtection && line.individualProtection && line.type !== 'Home Internet' && line.type !== 'Custom') {
-                protCost = individualProtection[line.type];
+            if (!multiDeviceProtection && line.type !== 'Home Internet') {
+                if (line.type === 'Custom') {
+                    protCost = parseAmount(line.customProtectionCost);
+                } else if (line.individualProtection) {
+                    protCost = individualProtection[line.type];
+                }
             }
 
             const deviceMonthly = Math.max(0, (line.devicePrice / financingMonths) - (line.promoCredit / financingMonths));
             const monthlyPromoCredit = parseAmount(line.promoCredit) / financingMonths;
+            const taxSurcharge = getTaxSurchargeForLine(line, taxSettings);
 
             return {
                 ...line,
@@ -165,6 +183,7 @@
                 protCost,
                 deviceMonthly,
                 adjSum,
+                taxSurcharge,
                 monthlyPromoCredit,
                 finalPlan: planBase - autopaySaving - mhSaving
             };
@@ -186,15 +205,20 @@
                 ...line,
                 isDiscounted,
                 connectedDiscountAmt: discountedAmt,
-                totalLineCost: actualPlanCost + line.perkCost + line.protCost + line.deviceMonthly + line.adjSum
+                totalLineCost: actualPlanCost + line.perkCost + line.protCost + line.deviceMonthly + line.adjSum + (includeEstimatedTaxes ? line.taxSurcharge : 0)
             };
         });
 
         // Account totals are intentionally calculated at the end so the UI can
         // display both per-line numbers and whole-account savings from one result.
-        const protectableLinesCount = lines.filter(line => line.type !== 'Home Internet' && line.type !== 'Custom').length;
+        const protectableLinesCount = lines.filter(line => (
+            line.type !== 'Home Internet' && (line.type !== 'Custom' || line.customIncludeInVmdp)
+        )).length;
         const vmpCost = multiDeviceProtection ? Math.min(protectableLinesCount * multiProtection.perLine, multiProtection.monthlyCap) : 0;
         const accAdjSum = sumAdjustments(accountAdjustments);
+        const totalEstimatedTaxes = includeEstimatedTaxes
+            ? finalLines.reduce((acc, line) => acc + line.taxSurcharge, 0)
+            : 0;
         const total = finalLines.reduce((acc, line) => acc + line.totalLineCost, 0) + vmpCost + accAdjSum;
         const totalFullDeviceSavings = finalLines.reduce((acc, line) => acc + parseAmount(line.promoCredit), 0);
         const totalAutopay = finalLines.reduce((acc, line) => acc + line.autopaySaving, 0);
@@ -217,6 +241,7 @@
             total,
             vmpCost,
             accAdjSum,
+            totalEstimatedTaxes,
             totalWithoutAutopay: total + totalAutopay,
             totalFullDeviceSavings,
             totalMonthlySavings,

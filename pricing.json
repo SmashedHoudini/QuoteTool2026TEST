@@ -1,5 +1,5 @@
 {
-  "_fileNote": "Editable pricing/config for the V2 quote tool. The app loads this file at startup on GitHub Pages. Change plan names, prices, perk costs, protection prices, financing months, and discount settings here; change only the math rules in calculations.js.",
+  "_fileNote": "Editable pricing/config for the V2 quote tool. The app loads this file at startup on GitHub Pages. Change plan names, prices, perk costs, protection prices, financing months, tax estimates, and discount settings here; change only the math rules in calculations.js.",
   "smartphonePlans": [
     {
       "name": "Unlimited Welcome",
@@ -190,6 +190,13 @@
   "quoteSettings": {
     "financingMonths": 36,
     "connectedDeviceDiscountRate": 0.5,
+    "taxes&surcharges": {
+      "Smartphone": 7,
+      "Tablet": 4,
+      "Watch": 5,
+      "Home Internet": 0,
+      "Custom": 0
+    },
     "individualProtection": {
       "Smartphone": 19,
       "Watch": 19,

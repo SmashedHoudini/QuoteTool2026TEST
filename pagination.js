@@ -15,7 +15,7 @@
     const FOOTER_HEIGHT = 180;
     const DETAIL_ROW_HEIGHT = 18;
 
-    const estimateLineHeight = (line, customerViewMode) => {
+    const estimateLineHeight = (line, customerViewMode, includeEstimatedTaxes) => {
         if (customerViewMode !== 'detailed') {
             return 70 + (line.perks.length > 0 ? DETAIL_ROW_HEIGHT : 0);
         }
@@ -28,10 +28,11 @@
             + (line.mhSaving > 0 ? DETAIL_ROW_HEIGHT : 0)
             + (line.isDiscounted ? DETAIL_ROW_HEIGHT : 0)
             + (line.devicePrice > 0 ? DETAIL_ROW_HEIGHT : 0)
-            + (line.protCost > 0 ? DETAIL_ROW_HEIGHT : 0);
+            + (line.protCost > 0 ? DETAIL_ROW_HEIGHT : 0)
+            + (includeEstimatedTaxes && line.taxSurcharge > 0 ? DETAIL_ROW_HEIGHT : 0);
     };
 
-    const paginateQuote = ({ calculations, customerViewMode, multiDeviceProtection, accountAdjustments, oneTimeCredits }) => {
+    const paginateQuote = ({ calculations, customerViewMode, multiDeviceProtection, accountAdjustments, oneTimeCredits, includeEstimatedTaxes }) => {
         // The PDF view is HTML first, then captured into a PDF. These estimates
         // decide where to split pages so the capture does not chop a line in half.
         const pages = [];
@@ -45,7 +46,7 @@
         };
 
         calculations.processedLines.forEach(line => {
-            const itemHeight = estimateLineHeight(line, customerViewMode);
+            const itemHeight = estimateLineHeight(line, customerViewMode, includeEstimatedTaxes);
             if (currentHeight + itemHeight > MAX_SAFE_PAGE_HEIGHT) pushPage();
             currentItems.push({ type: 'line', data: line });
             currentHeight += itemHeight;

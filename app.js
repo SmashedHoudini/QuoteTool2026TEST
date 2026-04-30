@@ -61,6 +61,10 @@ const App = ({ config }) => {
     const [oneTimeCredits, setOneTimeCredits] = useState([]);
     const [showOneTimeCreditsModal, setShowOneTimeCreditsModal] = useState(false);
     const [editingLabelId, setEditingLabelId] = useState(null);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [includeEstimatedTaxes, setIncludeEstimatedTaxes] = useState(false);
+    const [activeCustomTaxLineId, setActiveCustomTaxLineId] = useState(null);
+    const [activeCustomProtectionLineId, setActiveCustomProtectionLineId] = useState(null);
     
     // PDF Generation States
     const [scale, setScale] = useState(1);
@@ -84,6 +88,7 @@ const App = ({ config }) => {
                 if (state.accountAdjustments) setAccountAdjustments(state.accountAdjustments);
                 if (state.multiDeviceProtection !== undefined) setMultiDeviceProtection(state.multiDeviceProtection);
                 if (state.oneTimeCredits) setOneTimeCredits(state.oneTimeCredits);
+                if (state.includeEstimatedTaxes !== undefined) setIncludeEstimatedTaxes(state.includeEstimatedTaxes);
                 if (state.customerName) {
                     setCustomerName(state.customerName);
                     setShowNameField(true);
@@ -140,6 +145,7 @@ const App = ({ config }) => {
             accountAdjustments,
             multiDeviceProtection,
             oneTimeCredits,
+            includeEstimatedTaxes,
             customerName
         });
 
@@ -266,28 +272,36 @@ const App = ({ config }) => {
         lines,
         multiDeviceProtection,
         accountAdjustments,
-        oneTimeCredits
-    }, config), [lines, multiDeviceProtection, accountAdjustments, oneTimeCredits, config]);
+        oneTimeCredits,
+        includeEstimatedTaxes
+    }, config), [lines, multiDeviceProtection, accountAdjustments, oneTimeCredits, includeEstimatedTaxes, config]);
 
     const paginatedContent = useMemo(() => paginateQuote({
         calculations,
         customerViewMode,
         multiDeviceProtection,
         accountAdjustments,
-        oneTimeCredits
-    }), [calculations, customerViewMode, multiDeviceProtection, accountAdjustments, oneTimeCredits]);
+        oneTimeCredits,
+        includeEstimatedTaxes
+    }), [calculations, customerViewMode, multiDeviceProtection, accountAdjustments, oneTimeCredits, includeEstimatedTaxes]);
 
     const handleSavePdf = async () => {
         await saveQuotePdf({ paginatedContent, customerName, setIsGeneratingPdf });
     };
 
     const activeHardwareLine = lines.find(l => l.id === activeHardwareLineId);
+    const activeCustomTaxLine = lines.find(l => l.id === activeCustomTaxLineId);
+    const activeCustomProtectionLine = lines.find(l => l.id === activeCustomProtectionLineId);
     return (
         <div className="min-h-screen">
             {/* Only show nav if not currently in print preview mode */}
             {view !== 'print' && (
                 <nav className="sticky top-0 z-50 px-4 md:px-6 py-4 border-b border-black/10 flex justify-between items-center bg-stone-100/80 backdrop-blur-md text-black">
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => setIsMenuOpen(true)} title="Open menu" className="p-1.5 transition-colors flex items-center justify-center text-black/60 hover:text-black">
+                            <Icon name="Menu" size={18} />
+                        </button>
+                        <span className="h-5 w-px bg-black/20"></span>
                         <span className="text-lg md:text-xl font-black tracking-tight">verizon</span>
                         <span className="mx-2 md:mx-3 h-5 w-px bg-black/20"></span>
                         <span className="text-lg md:text-xl font-light tracking-tight opacity-60">TCC</span>
@@ -305,6 +319,30 @@ const App = ({ config }) => {
                         </div>
                     </div>
                 </nav>
+            )}
+
+            {isMenuOpen && (
+                <div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}>
+                    <aside className="h-full w-[300px] max-w-[82vw] bg-white text-black shadow-2xl border-r border-black/10 p-6 flex flex-col gap-6" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-black">Quote Options</h2>
+                            </div>
+                            <button onClick={() => setIsMenuOpen(false)} className="p-2 hover:bg-black/5 rounded-full transition-colors">
+                                <Icon name="X" size={22} />
+                            </button>
+                        </div>
+
+                        <button onClick={() => setIncludeEstimatedTaxes(prev => !prev)} className="w-full bg-stone-50 border border-black/10 rounded-2xl p-4 flex items-center justify-between text-left hover:border-black/20 transition-colors">
+                            <div>
+                                <p className="text-sm font-black">Est. Tax/Sur.</p>
+                            </div>
+                            <span className={`w-11 h-6 rounded-full relative transition-colors shrink-0 ${includeEstimatedTaxes ? 'bg-verizon-red' : 'bg-gray-300'}`}>
+                                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${includeEstimatedTaxes ? 'right-1' : 'left-1'}`} />
+                            </span>
+                        </button>
+                    </aside>
+                </div>
             )}
 
             <main className={view === 'print' ? 'w-full' : 'max-w-[1340px] mx-auto p-4 md:p-6 mb-24 text-black'}>
@@ -391,8 +429,17 @@ const App = ({ config }) => {
                                             <span className="col-span-2 text-[11px] font-bold text-black/40 uppercase tracking-wider">Add-ons & Adjust</span>
                                             <button onClick={() => setActivePerkLineId(line.id)} className="flex items-center justify-between px-3 lg:px-5 py-3 bg-yellow-100 border border-yellow-300 rounded-lg text-xs font-bold hover:bg-yellow-200 transition-colors text-left text-black"><span className="flex items-center gap-2 min-w-0"><Icon name="Gift" size={16}/> Perks ({line.perks.length})</span><Icon name="ChevronRight" size={16} /></button>
                                             <button onClick={() => setActiveAdjLineId(line.id)} className="flex items-center justify-between px-3 lg:px-5 py-3 bg-stone-100 border border-stone-300 rounded-lg text-xs font-bold hover:bg-stone-200 transition-colors text-left text-black"><span className="flex items-center gap-2 min-w-0"><Icon name="PlusCircle" size={16}/> Adjust ({line.adjustments.length})</span><Icon name="ChevronRight" size={16} /></button>
+                                            {includeEstimatedTaxes && line.type === 'Custom' && (
+                                                <button onClick={() => setActiveCustomTaxLineId(line.id)} className="col-span-2 flex items-center justify-between px-5 py-2.5 border rounded-lg text-xs font-bold transition-all bg-stone-50 text-black/60 hover:bg-stone-100"><span className="flex items-center gap-2"><Icon name="ReceiptText" size={16} /> Taxes/Sur.</span><span className="text-black/40">${parseFloat(line.customTaxSurcharge || 0).toFixed(2)}</span></button>
+                                            )}
                                             {!multiDeviceProtection && line.type !== 'Custom' && line.type !== 'Home Internet' && (
                                                 <button onClick={() => updateLine(line.id, { individualProtection: !line.individualProtection })} className={`col-span-2 flex items-center gap-2 px-5 py-2.5 border rounded-lg text-xs font-bold transition-all ${line.individualProtection ? 'bg-black text-white' : 'bg-stone-50 text-black/60'}`}><Icon name="ShieldCheck" size={16} /> {line.individualProtection ? 'VMP protected' : 'Add protection'}</button>
+                                            )}
+                                            {!multiDeviceProtection && line.type === 'Custom' && (
+                                                <button onClick={() => setActiveCustomProtectionLineId(line.id)} className={`col-span-2 flex items-center justify-between px-5 py-2.5 border rounded-lg text-xs font-bold transition-all ${parseFloat(line.customProtectionCost || 0) > 0 ? 'bg-black text-white' : 'bg-stone-50 text-black/60'}`}><span className="flex items-center gap-2"><Icon name="ShieldCheck" size={16} /> {parseFloat(line.customProtectionCost || 0) > 0 ? 'VMP protected' : 'Add protection'}</span>{parseFloat(line.customProtectionCost || 0) > 0 && <span>${parseFloat(line.customProtectionCost || 0).toFixed(2)}</span>}</button>
+                                            )}
+                                            {multiDeviceProtection && line.type === 'Custom' && (
+                                                <button onClick={() => updateLine(line.id, { customIncludeInVmdp: !line.customIncludeInVmdp })} className={`col-span-2 flex items-center gap-2 px-5 py-2.5 border rounded-lg text-xs font-bold transition-all ${line.customIncludeInVmdp ? 'bg-black text-white' : 'bg-stone-50 text-black/60'}`}><Icon name="ShieldCheck" size={16} /> Include in VMDP</button>
                                             )}
                                             <button onClick={() => removeLine(line.id)} className="col-span-2 mt-auto flex items-center justify-center gap-2 px-5 py-2 text-xs font-bold text-verizon-red hover:bg-red-50 rounded-lg transition-colors"><Icon name="Trash2" size={16} /> Remove line</button>
                                         </div>
@@ -431,7 +478,7 @@ const App = ({ config }) => {
                                 <div className="flex-1"><h2 className="text-lg md:text-xl font-black mb-1">Monthly total</h2><p className="text-white/70 text-[11px] md:text-xs font-medium uppercase tracking-widest opacity-80">with Auto Pay & Paper-free billing</p></div>
                                 <div className="text-right text-white">
                                     <div className="flex items-baseline justify-center md:justify-end gap-1"><span className="text-5xl md:text-6xl font-black tracking-tighter leading-none">${calculations.total.toFixed(2)}</span><span className="text-xl font-bold opacity-40">/mo</span></div>
-                                    <div className="flex flex-col items-center lg:items-end mt-2"><p className="text-white text-[10px] uppercase tracking-widest font-bold opacity-60">+ Taxes & Surcharges</p><p className="text-white font-black text-[11px] uppercase tracking-widest opacity-100 mt-1">Estimated ${calculations.totalWithoutAutopay.toFixed(2)} without Auto Pay</p></div>
+                                    <div className="flex flex-col items-center lg:items-end mt-2"><p className="text-white text-[10px] uppercase tracking-widest font-bold opacity-60">{includeEstimatedTaxes ? 'Incl. Taxes & Surcharges' : '+ Taxes & Surcharges'}</p><p className="text-white font-black text-[11px] uppercase tracking-widest opacity-100 mt-1">Estimated ${calculations.totalWithoutAutopay.toFixed(2)} without Auto Pay</p></div>
                                 </div>
                             </div>
                             
@@ -457,6 +504,7 @@ const App = ({ config }) => {
                                                                     {line.perks.map(pName => <p key={pName} className="text-sm font-medium opacity-50">${getPerkCost(pName).toFixed(2)} {pName}</p>)}
                                                                     {line.adjustments.map(adj => <p key={adj.id} className={`text-sm tracking-tight ${adj.type === 'credit' ? 'text-emerald-600 font-bold' : 'opacity-50'}`}>{adj.type === 'credit' ? '-' : ''}${parseFloat(adj.amount || 0).toFixed(2)} {adj.label}</p>)}
                                                                     {line.protCost > 0 && <p className="text-sm font-medium opacity-50">${line.protCost}.00 Device protection</p>}
+                                                                    {includeEstimatedTaxes && line.taxSurcharge > 0 && <p className="text-sm font-medium opacity-50">${line.taxSurcharge.toFixed(2)} Est. Taxes & Surcharges</p>}
                                                                 </div>
                                                             ) : (
                                                                 <div className="mt-2 space-y-1">
@@ -543,7 +591,7 @@ const App = ({ config }) => {
                                 </div>
                             </div>
                             
-                            <div className="p-8 bg-stone-50 border-t border-black/5 flex items-start gap-2"><span className="text-[10px] font-medium opacity-40 shrink-0 mt-0.5">*</span><p className="text-[10px] font-medium leading-relaxed opacity-40 italic">Estimate only. Taxes, surcharges, and activation fees not included. Promotions may change. Quote guaranteed for today.</p></div>
+                            <div className="p-8 bg-stone-50 border-t border-black/5 flex items-start gap-2"><span className="text-[10px] font-medium opacity-40 shrink-0 mt-0.5">*</span><p className="text-[10px] font-medium leading-relaxed opacity-40 italic">{includeEstimatedTaxes ? 'Estimate only. Activation fees not included. Promotions may change. Quote guaranteed for today.' : 'Estimate only. Taxes, surcharges, and activation fees not included. Promotions may change. Quote guaranteed for today.'}</p></div>
                         </div>
                         <div className="text-center"><button onClick={() => setView('rep')} className="text-black font-bold text-[10px] uppercase tracking-widest opacity-20 hover:opacity-60 transition-all">Back to builder</button></div>
                     </div>
@@ -576,7 +624,7 @@ const App = ({ config }) => {
                                                         <span className="text-lg font-bold opacity-60">/mo</span>
                                                     </div>
                                                     <div className="flex flex-col items-end mt-4">
-                                                        <p className="text-[10px] uppercase tracking-widest font-bold opacity-60 pt-1">+ Taxes & Surcharges</p>
+                                                        <p className="text-[10px] uppercase tracking-widest font-bold opacity-60 pt-1">{includeEstimatedTaxes ? 'Incl. Taxes & Surcharges' : '+ Taxes & Surcharges'}</p>
                                                         <p className="font-black text-[11px] uppercase tracking-widest mt-1">Estimated ${calculations.totalWithoutAutopay.toFixed(2)} without Auto Pay</p>
                                                     </div>
                                                 </div>
@@ -610,6 +658,7 @@ const App = ({ config }) => {
                                                                             {line.perks.map(pName => <p key={pName} className="text-xs font-medium opacity-80">${getPerkCost(pName).toFixed(2)} {pName}</p>)}
                                                                             {line.adjustments.map(adj => <p key={adj.id} className={`text-xs tracking-tight ${adj.type === 'credit' ? 'text-black font-semibold opacity-80' : 'opacity-80'}`}>{adj.type === 'credit' ? '-' : ''}${parseFloat(adj.amount || 0).toFixed(2)} {adj.label}</p>)}
                                                                             {line.protCost > 0 && <p className="text-xs font-medium opacity-80">${line.protCost}.00 Device protection</p>}
+                                                                            {includeEstimatedTaxes && line.taxSurcharge > 0 && <p className="text-xs font-medium opacity-80">${line.taxSurcharge.toFixed(2)} Est. Taxes & Surcharges</p>}
                                                                         </div>
                                                                     ) : (
                                                                         <div className="mt-1 space-y-0.5">
@@ -697,14 +746,14 @@ const App = ({ config }) => {
                                                             {calculations.totalOneTimeCredits > 0 && (
                                                                 <div className="text-right">
                                                                     <p className="text-[9px] font-black uppercase opacity-60 leading-none mb-1 text-black">One-Time Credits</p>
-                                                                    <span className="text-lg font-black text-black tracking-tighter leading-none">-{formatRoundedDollars(calculations.totalOneTimeCredits)}</span>
+                                                                    <span className="text-lg font-black text-black tracking-tighter leading-none">{formatRoundedDollars(calculations.totalOneTimeCredits)}</span>
                                                                 </div>
                                                             )}
                                                         </div>
                                                         
                                                         <div className="mt-12 flex items-start gap-2 opacity-60 border-t border-black/10 pt-4">
                                                             <span className="text-[9px] font-medium shrink-0 mt-0.5">*</span>
-                                                            <p className="text-[9px] font-medium leading-relaxed italic">Estimate only. Taxes, surcharges, and activation fees not included. Promotions may change. Quote guaranteed for today.</p>
+                                                            <p className="text-[9px] font-medium leading-relaxed italic">{includeEstimatedTaxes ? 'Estimate only. Activation fees not included. Promotions may change. Quote guaranteed for today.' : 'Estimate only. Taxes, surcharges, and activation fees not included. Promotions may change. Quote guaranteed for today.'}</p>
                                                         </div>
                                                     </div>
                                                 );
@@ -749,6 +798,31 @@ const App = ({ config }) => {
                             <div className="p-8 bg-black text-white rounded-[28px] flex justify-between items-center shadow-xl text-white"><div><p className="text-[11px] font-bold opacity-60">Net monthly</p><p className="text-4xl font-black tracking-tight">${((activeHardwareLine.devicePrice - activeHardwareLine.promoCredit)/FINANCING_MONTHS).toFixed(2)}</p></div><div className="text-right text-xs font-bold opacity-60 uppercase tracking-widest">{FINANCING_MONTHS} Months</div></div>
                         </div>
                         <div className="p-8 border-t border-black/5 text-black"><button onClick={() => setActiveHardwareLineId(null)} className="w-full py-6 bg-black text-white rounded-2xl font-black text-xl hover:scale-[1.01] active:scale-95 transition-all shadow-lg text-white">Done</button></div>
+                    </div>
+                </div>
+            )}
+
+            {activeCustomTaxLineId && activeCustomTaxLine && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setActiveCustomTaxLineId(null)}>
+                    <div className="relative w-full max-w-md bg-white rounded-[32px] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="p-8 border-b border-black/5 bg-stone-50 flex justify-between items-center"><h2 className="text-xl font-black leading-none">Taxes/Sur.</h2><button onClick={() => setActiveCustomTaxLineId(null)} className="p-2 hover:bg-black/5 rounded-full"><Icon name="X" size={24}/></button></div>
+                        <div className="p-8">
+                            <div className="space-y-3 text-black"><label className="text-[11px] font-bold uppercase tracking-widest opacity-40">Monthly tax/surcharge</label><div className="relative"><span className="absolute left-6 top-1/2 -translate-y-1/2 text-lg font-bold opacity-40">$</span><input type="number" inputMode="decimal" step="0.01" onWheel={e => e.currentTarget.blur()} value={activeCustomTaxLine.customTaxSurcharge || ''} onFocus={e => e.target.select()} onChange={e => updateLine(activeCustomTaxLineId, { customTaxSurcharge: parseFloat(e.target.value) || 0 })} placeholder="0.00" className="w-full pl-10 pr-6 py-5 bg-stone-50 border border-black/10 rounded-2xl font-bold text-lg outline-none focus:border-black text-black" /></div></div>
+                        </div>
+                        <div className="p-8 border-t border-black/5 text-black"><button onClick={() => setActiveCustomTaxLineId(null)} className="w-full py-6 bg-black text-white rounded-2xl font-black text-xl hover:scale-[1.01] active:scale-95 transition-all shadow-lg text-white">Done</button></div>
+                    </div>
+                </div>
+            )}
+
+            {activeCustomProtectionLineId && activeCustomProtectionLine && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setActiveCustomProtectionLineId(null)}>
+                    <div className="relative w-full max-w-md bg-white rounded-[32px] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="p-8 border-b border-black/5 bg-stone-50 flex justify-between items-center"><h2 className="text-xl font-black leading-none">Protection cost.</h2><button onClick={() => setActiveCustomProtectionLineId(null)} className="p-2 hover:bg-black/5 rounded-full"><Icon name="X" size={24}/></button></div>
+                        <div className="p-8 space-y-6">
+                            <div className="space-y-3 text-black"><label className="text-[11px] font-bold uppercase tracking-widest opacity-40">Monthly protection</label><input type="number" inputMode="decimal" onWheel={e => e.currentTarget.blur()} value={activeCustomProtectionLine.customProtectionCost || ''} onFocus={e => e.target.select()} onChange={e => updateLine(activeCustomProtectionLineId, { customProtectionCost: parseFloat(e.target.value) || 0 })} placeholder="0.00" className="w-full px-6 py-5 bg-stone-50 border border-black/10 rounded-2xl font-bold text-lg outline-none focus:border-black text-black" /></div>
+                            <div className="p-8 bg-black text-white rounded-[28px] flex justify-between items-center shadow-xl text-white"><div><p className="text-[11px] font-bold opacity-60">Protection</p><p className="text-4xl font-black tracking-tight">${parseFloat(activeCustomProtectionLine.customProtectionCost || 0).toFixed(2)}</p></div><div className="text-right text-xs font-bold opacity-60 uppercase tracking-widest">Monthly</div></div>
+                        </div>
+                        <div className="p-8 border-t border-black/5 text-black"><button onClick={() => setActiveCustomProtectionLineId(null)} className="w-full py-6 bg-black text-white rounded-2xl font-black text-xl hover:scale-[1.01] active:scale-95 transition-all shadow-lg text-white">Done</button></div>
                     </div>
                 </div>
             )}
