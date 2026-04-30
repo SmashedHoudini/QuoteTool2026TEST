@@ -237,11 +237,29 @@ const App = ({ config }) => {
         PERKS.find(perk => perk.name === perkName)?.cost || 0
     );
 
+    const formatRoundedDollars = (amount) => `$${Math.round(amount).toLocaleString()}`;
+
     const getLineIconName = (lineType) => {
         if (lineType === 'Tablet') return 'Tablet';
         if (lineType === 'Watch') return 'Watch';
         if (lineType === 'Home Internet') return 'Wifi';
         return 'Smartphone';
+    };
+
+    const getOneTimeItemType = (item) => item.type || 'credit';
+
+    const oneTimeCreditCount = oneTimeCredits.filter(item => getOneTimeItemType(item) === 'credit').length;
+    const oneTimeChargeCount = oneTimeCredits.filter(item => getOneTimeItemType(item) === 'charge').length;
+    const hasOneTimeCredits = oneTimeCreditCount > 0;
+    const hasOneTimeCharges = oneTimeChargeCount > 0;
+    const oneTimeDisplayLabel = hasOneTimeCredits && hasOneTimeCharges
+        ? 'One-time charges & credits'
+        : hasOneTimeCharges ? 'One-time charges' : 'One-time credits';
+    const oneTimeDisplayIcon = hasOneTimeCharges ? 'DollarSign' : 'Gift';
+    const oneTimeDisplayTotal = (amount) => {
+        const formatted = Math.abs(amount).toFixed(2);
+        if (amount < 0) return `-$${formatted}`;
+        return `$${formatted}`;
     };
 
     const calculations = useMemo(() => calculateQuote({
@@ -316,7 +334,7 @@ const App = ({ config }) => {
                                 <Icon name="PlusCircle" size={22} className="opacity-40" />
                             </button>
                             <button onClick={() => setShowOneTimeCreditsModal(true)} className="bg-white p-5 border border-black/10 rounded-xl flex items-center justify-between shadow-sm hover:border-black transition-colors text-left">
-                                <div><p className="font-bold text-sm">One-time credits</p><p className="text-[11px] opacity-50 font-medium">{oneTimeCredits.length} credit(s)</p></div>
+                                <div><p className="font-bold text-sm">One-time charges & credits</p><p className="text-[11px] opacity-50 font-medium">{oneTimeCredits.length} item(s)</p></div>
                                 <Icon name="PlusCircle" size={22} className="opacity-40" />
                             </button>
                         </div>
@@ -325,7 +343,7 @@ const App = ({ config }) => {
                             {calculations.processedLines.map(line => (
                                 <div key={line.id} className="bg-white border border-black/10 rounded-xl overflow-hidden shadow-sm">
                                     <div className="p-4 md:p-5 flex flex-col lg:flex-row gap-6">
-                                        <div className="w-full lg:w-64 space-y-2 shrink-0">
+                                        <div className="w-full lg:w-48 xl:w-64 space-y-2 shrink-0">
                                             <div className="flex items-center gap-2">
                                                 {editingLabelId === line.id ? (
                                                     <input autoFocus value={line.label} className="text-xs font-bold border-b border-black outline-none bg-transparent w-full text-black" onBlur={() => setEditingLabelId(null)} onKeyDown={e => e.key === 'Enter' && setEditingLabelId(null)} onChange={e => updateLine(line.id, { label: e.target.value })} />
@@ -409,11 +427,11 @@ const App = ({ config }) => {
                             <p className="text-sm md:text-base text-black/60 font-medium italic opacity-70">Reliable, clear, and built for you.</p>
                         </header>
                         <div className="bg-white rounded-[40px] shadow-xl overflow-hidden border border-black/5">
-                            <div className="bg-verizon-red p-8 md:p-10 text-white flex flex-col md:flex-row justify-between items-center text-center md:text-left gap-4">
-                                <div className="flex-1 order-2 md:order-1"><h2 className="text-lg md:text-xl font-black mb-1">Monthly total</h2><p className="text-white/70 text-[11px] md:text-xs font-medium uppercase tracking-widest opacity-80">with Auto Pay & Paper-free billing</p></div>
-                                <div className="text-right text-white order-1 md:order-2">
+                            <div className="bg-verizon-red p-8 md:p-10 text-white flex flex-col lg:flex-row justify-between items-center text-center lg:text-left gap-4">
+                                <div className="flex-1"><h2 className="text-lg md:text-xl font-black mb-1">Monthly total</h2><p className="text-white/70 text-[11px] md:text-xs font-medium uppercase tracking-widest opacity-80">with Auto Pay & Paper-free billing</p></div>
+                                <div className="text-right text-white">
                                     <div className="flex items-baseline justify-center md:justify-end gap-1"><span className="text-5xl md:text-6xl font-black tracking-tighter leading-none">${calculations.total.toFixed(2)}</span><span className="text-xl font-bold opacity-40">/mo</span></div>
-                                    <div className="flex flex-col items-center md:items-end mt-2"><p className="text-white text-[10px] uppercase tracking-widest font-bold opacity-60">+ Taxes & Surcharges</p><p className="text-white font-black text-[11px] uppercase tracking-widest opacity-100 mt-1">Estimated ${calculations.totalWithoutAutopay.toFixed(2)} without Auto Pay</p></div>
+                                    <div className="flex flex-col items-center lg:items-end mt-2"><p className="text-white text-[10px] uppercase tracking-widest font-bold opacity-60">+ Taxes & Surcharges</p><p className="text-white font-black text-[11px] uppercase tracking-widest opacity-100 mt-1">Estimated ${calculations.totalWithoutAutopay.toFixed(2)} without Auto Pay</p></div>
                                 </div>
                             </div>
                             
@@ -473,24 +491,24 @@ const App = ({ config }) => {
                                         )}
                                         {oneTimeCredits.length > 0 && (
                                             <div className="flex flex-row gap-4 md:gap-8 items-start pt-6 border-t border-black/5 text-black">
-                                                <div className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center shrink-0 border border-black/5 opacity-40"><Icon name="Gift" size={24} /></div>
+                                                <div className="w-10 h-10 rounded-xl bg-stone-100 flex items-center justify-center shrink-0 border border-black/5 opacity-40"><Icon name={oneTimeDisplayIcon} size={24} /></div>
                                                 <div className="flex-1 w-full text-black">
                                                     <div className="flex justify-between items-start w-full">
                                                         <div>
-                                                            <h4 className="text-lg font-black leading-tight">One-time credits</h4>
+                                                            <h4 className="text-lg font-black leading-tight">{oneTimeDisplayLabel}</h4>
                                                             {customerViewMode === 'detailed' ? (
                                                                 <div className="mt-3 space-y-1 border-l-2 border-stone-100 pl-4">
-                                                                    {oneTimeCredits.map(credit => (
-                                                                        <p key={credit.id} className="text-sm tracking-tight text-emerald-600 font-bold">
-                                                                            -${parseFloat(credit.amount || 0).toFixed(2)} {credit.label || 'Credit'}
+                                                                    {oneTimeCredits.map(item => (
+                                                                        <p key={item.id} className={`text-sm tracking-tight ${getOneTimeItemType(item) === 'credit' ? 'text-emerald-600 font-bold' : 'opacity-50'}`}>
+                                                                            {getOneTimeItemType(item) === 'credit' ? '-' : ''}${parseFloat(item.amount || 0).toFixed(2)} {item.label || (getOneTimeItemType(item) === 'credit' ? 'Credit' : 'Charge')}
                                                                         </p>
                                                                     ))}
                                                                 </div>
                                                             ) : (
-                                                                <p className="text-xs font-medium opacity-50 mt-1 italic">One-time credits applied</p>
+                                                                <p className="text-xs font-medium opacity-50 mt-1 italic">{oneTimeDisplayLabel} applied</p>
                                                             )}
                                                         </div>
-                                                        <div className="text-right"><span className="font-black text-xl text-emerald-600">-${calculations.totalOneTimeCredits.toFixed(2)}</span></div>
+                                                        <div className="text-right"><span className={`font-black text-xl ${calculations.totalOneTimeNet < 0 ? 'text-emerald-600' : 'text-black'}`}>{oneTimeDisplayTotal(calculations.totalOneTimeNet)}</span></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -504,19 +522,21 @@ const App = ({ config }) => {
                                         <button onClick={() => setCustomerViewMode('simple')} className={`px-3 md:px-4 py-1.5 rounded-lg text-[9px] md:text-[10px] font-bold uppercase transition-all ${customerViewMode === 'simple' ? 'bg-black text-white shadow-sm' : 'text-black/40 hover:text-black'}`}>Simple</button>
                                     </div>
 
-                                    <div className="flex flex-row flex-nowrap sm:flex-wrap gap-2 w-full sm:w-auto">
-                                        <div className="p-2 sm:p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 sm:gap-3 text-emerald-950 shadow-sm flex-1 min-w-0 sm:max-w-[180px] md:max-w-xs">
-                                            <div className="w-7 h-7 bg-emerald-500 rounded-lg flex items-center justify-center shrink-0 text-white"><Icon name="Smartphone" size={14} /></div>
-                                            <div className="text-right"><p className="text-[9px] md:text-[10px] font-black uppercase opacity-60 leading-none mb-0.5">Device Savings</p><span className="text-xl md:text-2xl font-black text-emerald-600 tracking-tighter leading-none">${calculations.totalFullDeviceSavings.toFixed(2)}</span></div>
-                                        </div>
-                                        <div className="p-2 sm:p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 sm:gap-3 text-emerald-950 shadow-sm flex-1 min-w-0 sm:max-w-[180px] md:max-w-xs">
+                                    <div className="flex flex-row flex-wrap justify-end gap-2 w-full sm:w-auto">
+                                        {calculations.totalFullDeviceSavings > 0 && (
+                                            <div className="p-2 sm:p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 sm:gap-3 text-emerald-950 shadow-sm flex-none w-[31%] min-w-[96px] max-w-[120px] sm:w-auto sm:max-w-[180px] md:max-w-xs overflow-hidden">
+                                                <div className="w-7 h-7 bg-emerald-500 rounded-lg flex items-center justify-center shrink-0 text-white"><Icon name="Smartphone" size={14} /></div>
+                                                <div className="min-w-0 flex-1 text-center sm:text-right"><p className="text-[clamp(7px,2vw,9px)] md:text-[10px] font-black uppercase opacity-60 leading-tight mb-0.5">Device Savings</p><span className="block whitespace-nowrap text-[clamp(10px,3.2vw,20px)] md:text-2xl font-black text-emerald-600 tracking-tight leading-none">{formatRoundedDollars(calculations.totalFullDeviceSavings)}</span></div>
+                                            </div>
+                                        )}
+                                        <div className="p-2 sm:p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 sm:gap-3 text-emerald-950 shadow-sm flex-none w-[31%] min-w-[96px] max-w-[120px] sm:w-auto sm:max-w-[180px] md:max-w-xs overflow-hidden">
                                             <div className="w-7 h-7 bg-emerald-500 rounded-lg flex items-center justify-center shrink-0 text-white"><Icon name="DollarSign" size={16} /></div>
-                                            <div className="text-right"><p className="text-[9px] md:text-[10px] font-black uppercase opacity-60 leading-none mb-0.5">Monthly Savings</p><span className="text-xl md:text-2xl font-black text-emerald-600 tracking-tighter leading-none">${calculations.totalMonthlySavings.toFixed(2)}</span></div>
+                                            <div className="min-w-0 flex-1 text-center sm:text-right"><p className="text-[clamp(7px,2vw,9px)] md:text-[10px] font-black uppercase opacity-60 leading-tight mb-0.5">Monthly Savings</p><span className="block whitespace-nowrap text-[clamp(10px,3.2vw,20px)] md:text-2xl font-black text-emerald-600 tracking-tight leading-none">{formatRoundedDollars(calculations.totalMonthlySavings)}</span></div>
                                         </div>
                                         {calculations.totalOneTimeCredits > 0 && (
-                                            <div className="p-2 sm:p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 sm:gap-3 text-emerald-950 shadow-sm flex-1 min-w-0 sm:max-w-[180px] md:max-w-xs">
-                                                <div className="w-7 h-7 bg-emerald-500 rounded-lg flex items-center justify-center shrink-0 text-white"><Icon name="Gift" size={16} /></div>
-                                                <div className="text-right"><p className="text-[9px] md:text-[10px] font-black uppercase opacity-60 leading-none mb-0.5">One-Time Credits</p><span className="text-xl md:text-2xl font-black text-emerald-600 tracking-tighter leading-none">${calculations.totalOneTimeCredits.toFixed(2)}</span></div>
+                                            <div className="p-2 sm:p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 sm:gap-3 text-emerald-950 shadow-sm flex-none w-[31%] min-w-[96px] max-w-[120px] sm:w-auto sm:max-w-[180px] md:max-w-xs overflow-hidden">
+                                                <div className="w-7 h-7 bg-emerald-500 rounded-lg flex items-center justify-center shrink-0 text-white"><Icon name={oneTimeDisplayIcon} size={16} /></div>
+                                                <div className="min-w-0 flex-1 text-center sm:text-right"><p className="text-[clamp(7px,2vw,9px)] md:text-[10px] font-black uppercase opacity-60 leading-tight mb-0.5">One-Time Credits</p><span className="block whitespace-nowrap text-[clamp(10px,3.2vw,20px)] md:text-2xl font-black text-emerald-600 tracking-tight leading-none">{formatRoundedDollars(calculations.totalOneTimeCredits)}</span></div>
                                             </div>
                                         )}
                                     </div>
@@ -635,25 +655,25 @@ const App = ({ config }) => {
                                                 return (
                                                     <div key={`otc-${i}`} className="flex gap-4 items-start pt-2 mb-4">
                                                         <div className="w-8 h-8 flex items-center justify-center shrink-0 opacity-60">
-                                                            <Icon name="Gift" size={24}/>
+                                                            <Icon name={oneTimeDisplayIcon} size={24}/>
                                                         </div>
                                                         <div className="flex-1 border-b border-black/5 pb-4">
                                                             <div className="flex justify-between items-start">
                                                                 <div>
-                                                                    <h4 className="text-sm font-black leading-tight">One-time credits</h4>
+                                                                    <h4 className="text-sm font-black leading-tight">{oneTimeDisplayLabel}</h4>
                                                                     {customerViewMode === 'detailed' ? (
                                                                         <div className="mt-1.5 space-y-0.5 border-l-2 border-black/10 pl-3 py-0.5">
-                                                                            {oneTimeCredits.map(credit => (
-                                                                                <p key={credit.id} className="text-xs tracking-tight text-black font-semibold opacity-80">
-                                                                                    -${parseFloat(credit.amount || 0).toFixed(2)} {credit.label || 'Credit'}
+                                                                            {oneTimeCredits.map(item => (
+                                                                                <p key={item.id} className="text-xs tracking-tight text-black font-semibold opacity-80">
+                                                                                    {getOneTimeItemType(item) === 'credit' ? '-' : ''}${parseFloat(item.amount || 0).toFixed(2)} {item.label || (getOneTimeItemType(item) === 'credit' ? 'Credit' : 'Charge')}
                                                                                 </p>
                                                                             ))}
                                                                         </div>
                                                                     ) : (
-                                                                        <p className="text-[10px] font-medium opacity-80 mt-0.5 italic">One-time credits applied</p>
+                                                                        <p className="text-[10px] font-medium opacity-80 mt-0.5 italic">{oneTimeDisplayLabel} applied</p>
                                                                     )}
                                                                 </div>
-                                                                <div className="text-right"><span className="font-black text-base text-black">-${calculations.totalOneTimeCredits.toFixed(2)}</span></div>
+                                                                <div className="text-right"><span className="font-black text-base text-black">{oneTimeDisplayTotal(calculations.totalOneTimeNet)}</span></div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -664,18 +684,20 @@ const App = ({ config }) => {
                                                 return (
                                                     <div key={`footer-${i}`}>
                                                         <div className="flex justify-end gap-6 pt-4 border-t border-black/20">
-                                                            <div className="text-right">
-                                                                <p className="text-[9px] font-black uppercase opacity-60 leading-none mb-1 text-black">Device Savings</p>
-                                                                <span className="text-lg font-black text-black tracking-tighter leading-none">${calculations.totalFullDeviceSavings.toFixed(2)}</span>
-                                                            </div>
+                                                            {calculations.totalFullDeviceSavings > 0 && (
+                                                                <div className="text-right">
+                                                                    <p className="text-[9px] font-black uppercase opacity-60 leading-none mb-1 text-black">Device Savings</p>
+                                                                    <span className="text-lg font-black text-black tracking-tighter leading-none">{formatRoundedDollars(calculations.totalFullDeviceSavings)}</span>
+                                                                </div>
+                                                            )}
                                                             <div className="text-right">
                                                                 <p className="text-[9px] font-black uppercase opacity-60 leading-none mb-1 text-black">Monthly Savings</p>
-                                                                <span className="text-lg font-black text-black tracking-tighter leading-none">${calculations.totalMonthlySavings.toFixed(2)}</span>
+                                                                <span className="text-lg font-black text-black tracking-tighter leading-none">{formatRoundedDollars(calculations.totalMonthlySavings)}</span>
                                                             </div>
                                                             {calculations.totalOneTimeCredits > 0 && (
                                                                 <div className="text-right">
                                                                     <p className="text-[9px] font-black uppercase opacity-60 leading-none mb-1 text-black">One-Time Credits</p>
-                                                                    <span className="text-lg font-black text-black tracking-tighter leading-none">-${calculations.totalOneTimeCredits.toFixed(2)}</span>
+                                                                    <span className="text-lg font-black text-black tracking-tighter leading-none">-{formatRoundedDollars(calculations.totalOneTimeCredits)}</span>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -770,16 +792,19 @@ const App = ({ config }) => {
             {showOneTimeCreditsModal && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setShowOneTimeCreditsModal(false)}>
                     <div className="relative w-full max-w-lg bg-white rounded-[40px] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="p-10 border-b border-black/5 bg-stone-50 flex justify-between items-center"><h2 className="text-2xl font-black">One-Time Credits</h2><button onClick={() => setShowOneTimeCreditsModal(false)} className="p-3 hover:bg-black/5 rounded-full"><Icon name="X" size={28}/></button></div>
+                        <div className="p-10 border-b border-black/5 bg-stone-50 flex justify-between items-center"><h2 className="text-2xl font-black">One-Time Charges & Credits</h2><button onClick={() => setShowOneTimeCreditsModal(false)} className="p-3 hover:bg-black/5 rounded-full"><Icon name="X" size={28}/></button></div>
                         <div className="p-10 space-y-6 max-h-[60vh] overflow-y-auto">
-                            {oneTimeCredits.map((credit, i) => (
-                                <div key={credit.id} className="flex gap-4 items-end bg-stone-50 p-6 rounded-3xl border border-black/5 text-black">
-                                    <div className="flex-grow space-y-1"><label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Label</label><input value={credit.label} onFocus={e => e.target.select()} placeholder="Credit Label" onChange={e => updateOneTimeCredit(i, { label: e.target.value })} className="w-full bg-white border border-black/10 px-4 py-3 rounded-xl text-sm font-bold focus:border-black outline-none text-black" /></div>
-                                    <div className="w-28 space-y-1"><label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Amount</label><input type="number" inputMode="decimal" value={credit.amount} onWheel={e => e.currentTarget.blur()} onFocus={e => e.target.select()} placeholder="0.00" onChange={e => updateOneTimeCredit(i, { amount: e.target.value })} className="w-full bg-white border border-black/10 px-4 py-3 rounded-xl text-sm font-bold focus:border-black outline-none text-black" /></div>
-                                    <button onClick={() => removeOneTimeCredit(i)} className="p-3 text-verizon-red hover:bg-red-50 rounded-lg transition-colors"><Icon name="Trash2" size={20}/></button>
+                            {oneTimeCredits.map((item, i) => (
+                                <div key={item.id} className="flex flex-col gap-4 bg-stone-50 p-6 rounded-3xl border border-black/5 text-black">
+                                    <div className="flex gap-2 p-1 bg-black/5 rounded-xl self-start"><button onClick={() => updateOneTimeCredit(i, { type: 'credit' })} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${getOneTimeItemType(item) === 'credit' ? 'bg-emerald-500 text-white shadow-sm' : 'text-black/40 hover:text-black'}`}>Credit</button><button onClick={() => updateOneTimeCredit(i, { type: 'charge' })} className={`px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${getOneTimeItemType(item) === 'charge' ? 'bg-black text-white shadow-sm' : 'text-black/40 hover:text-black'}`}>Charge</button></div>
+                                    <div className="flex gap-4 items-end text-black">
+                                        <div className="flex-grow space-y-1"><label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Label</label><input value={item.label} onFocus={e => e.target.select()} placeholder={getOneTimeItemType(item) === 'credit' ? 'Credit Label' : 'Charge Label'} onChange={e => updateOneTimeCredit(i, { label: e.target.value })} className="w-full bg-white border border-black/10 px-4 py-3 rounded-xl text-sm font-bold focus:border-black outline-none text-black" /></div>
+                                        <div className="w-28 space-y-1"><label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Amount</label><input type="number" inputMode="decimal" value={item.amount} onWheel={e => e.currentTarget.blur()} onFocus={e => e.target.select()} placeholder="0.00" onChange={e => updateOneTimeCredit(i, { amount: e.target.value })} className="w-full bg-white border border-black/10 px-4 py-3 rounded-xl text-sm font-bold focus:border-black outline-none text-black" /></div>
+                                        <button onClick={() => removeOneTimeCredit(i)} className="p-3 text-verizon-red hover:bg-red-50 rounded-lg transition-colors"><Icon name="Trash2" size={20}/></button>
+                                    </div>
                                 </div>
                             ))}
-                            <button onClick={() => setOneTimeCredits(prev => [...prev, createOneTimeCredit()])} className="w-full py-6 border-2 border-dashed border-black/10 rounded-2xl text-black/40 hover:text-black font-bold flex items-center justify-center gap-3 transition-all text-base uppercase"><Icon name="PlusCircle" size={20}/> Add one-time credit</button>
+                            <button onClick={() => setOneTimeCredits(prev => [...prev, createOneTimeCredit()])} className="w-full py-6 border-2 border-dashed border-black/10 rounded-2xl text-black/40 hover:text-black font-bold flex items-center justify-center gap-3 transition-all text-base uppercase"><Icon name="PlusCircle" size={20}/> Add one-time item</button>
                         </div>
                         <div className="p-8 border-t border-black/5 text-black"><button onClick={() => setShowOneTimeCreditsModal(false)} className="w-full py-6 bg-black text-white rounded-2xl font-black text-xl hover:scale-[1.01] active:scale-95 transition-all shadow-md text-white">Done</button></div>
                     </div>

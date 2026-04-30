@@ -2,7 +2,7 @@
     Quote state helpers.
 
     This file creates the plain JavaScript objects the app stores in React
-    state: lines, copied lines, adjustments, and one-time credits. Keeping those
+    state: lines, copied lines, adjustments, and one-time items. Keeping those
     object shapes here makes it easier to add fields later without hunting
     through the UI.
 
@@ -65,10 +65,13 @@
         type: 'credit'
     });
 
+    // Historical name, but the object can now be either a credit or a charge.
+    // New items start as credits because that matches the original workflow.
     const createOneTimeCredit = () => ({
         id: createId(),
         label: '',
-        amount: ''
+        amount: '',
+        type: 'credit'
     });
 
     window.QuoteTool = {

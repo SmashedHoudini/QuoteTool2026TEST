@@ -203,7 +203,13 @@
         const totalMonthlyPromoCredits = finalLines.reduce((acc, line) => acc + line.monthlyPromoCredit, 0);
         const allAdjustments = [...finalLines.flatMap(line => line.adjustments), ...accountAdjustments];
         const totalAdjustmentCredits = allAdjustments.reduce((acc, adjustment) => acc + (adjustment.type === 'credit' ? parseAmount(adjustment.amount) : 0), 0);
-        const totalOneTimeCredits = oneTimeCredits.reduce((acc, credit) => acc + parseAmount(credit.amount), 0);
+        const totalOneTimeCredits = oneTimeCredits.reduce((acc, item) => (
+            acc + ((item.type || 'credit') === 'credit' ? parseAmount(item.amount) : 0)
+        ), 0);
+        const totalOneTimeCharges = oneTimeCredits.reduce((acc, item) => (
+            acc + (item.type === 'charge' ? parseAmount(item.amount) : 0)
+        ), 0);
+        const totalOneTimeNet = totalOneTimeCharges - totalOneTimeCredits;
         const totalMonthlySavings = totalMonthlyPromoCredits + totalAutopay + totalMHSavings + totalConnectedDiscounts + totalAdjustmentCredits;
 
         return {
@@ -218,7 +224,9 @@
             totalMHSavings,
             totalAdjustmentCredits,
             totalConnectedDiscounts,
-            totalOneTimeCredits
+            totalOneTimeCredits,
+            totalOneTimeCharges,
+            totalOneTimeNet
         };
     };
 
