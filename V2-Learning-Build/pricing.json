@@ -1,0 +1,203 @@
+{
+  "_fileNote": "Editable pricing/config for the V2 quote tool. The app loads this file at startup on GitHub Pages. Change plan names, prices, perk costs, protection prices, financing months, and discount settings here; change only the math rules in calculations.js.",
+  "smartphonePlans": [
+    {
+      "name": "Unlimited Welcome",
+      "costs": [
+        75,
+        65,
+        50,
+        40
+      ],
+      "autopay": 10
+    },
+    {
+      "name": "Unlimited Plus",
+      "costs": [
+        90,
+        80,
+        65,
+        55
+      ],
+      "autopay": 10,
+      "discountSlots": 1
+    },
+    {
+      "name": "Unlimited Ultimate",
+      "costs": [
+        100,
+        90,
+        75,
+        65
+      ],
+      "autopay": 10,
+      "discountSlots": 2
+    },
+    {
+      "name": "Custom",
+      "costs": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "autopay": 0
+    }
+  ],
+  "tabletPlans": [
+    {
+      "name": "Welcome",
+      "price": 20
+    },
+    {
+      "name": "Unlimited",
+      "price": 40
+    },
+    {
+      "name": "Unlimited Plus",
+      "price": 50
+    },
+    {
+      "name": "Custom",
+      "price": 0
+    }
+  ],
+  "watchPlans": [
+    {
+      "name": "Unlimited",
+      "price": 15
+    },
+    {
+      "name": "Unlimited Plus",
+      "price": 25
+    },
+    {
+      "name": "Custom",
+      "price": 0
+    }
+  ],
+  "homeInternetPlans": [
+    {
+      "name": "LTE Home",
+      "price": 60,
+      "mhDiscount": 15,
+      "autopay": 10
+    },
+    {
+      "name": "LTE Home Plus",
+      "price": 80,
+      "mhDiscount": 15,
+      "autopay": 10
+    },
+    {
+      "name": "5G Home",
+      "price": 60,
+      "mhDiscount": 15,
+      "autopay": 10
+    },
+    {
+      "name": "5G Home Plus",
+      "price": 70,
+      "mhDiscount": 15,
+      "autopay": 10
+    },
+    {
+      "name": "5G Home Ultimate",
+      "price": 85,
+      "mhDiscount": 15,
+      "autopay": 10
+    },
+    {
+      "name": "VHI Lite",
+      "price": 60,
+      "mhDiscount": 15,
+      "autopay": 10
+    },
+    {
+      "name": "Custom",
+      "price": 0,
+      "mhDiscount": 0,
+      "autopay": 0
+    }
+  ],
+  "perks": [
+    {
+      "name": "Disney Bundle",
+      "cost": 10,
+      "savings": 9.99
+    },
+    {
+      "name": "Netflix & HBO Max",
+      "cost": 10,
+      "savings": 8.98
+    },
+    {
+      "name": "Google AI Pro",
+      "cost": 10,
+      "savings": 9.99
+    },
+    {
+      "name": "Apple One Individual",
+      "cost": 15,
+      "savings": 4.95
+    },
+    {
+      "name": "Apple One Family",
+      "cost": 20,
+      "savings": 5.95
+    },
+    {
+      "name": "Apple Music Family",
+      "cost": 10,
+      "savings": 6.99
+    },
+    {
+      "name": "100GB Hotspot",
+      "cost": 10,
+      "savings": 30
+    },
+    {
+      "name": "YouTube Premium",
+      "cost": 10,
+      "savings": 3.99
+    },
+    {
+      "name": "Unlimited Cloud Storage",
+      "cost": 10,
+      "savings": 3.99
+    },
+    {
+      "name": "Verizon Family Plus",
+      "cost": 10,
+      "savings": 4.99
+    },
+    {
+      "name": "Second Number",
+      "cost": 10,
+      "savings": 5
+    },
+    {
+      "name": "3 TravelPass Days",
+      "cost": 10,
+      "savings": 26
+    },
+    {
+      "name": "Fox One",
+      "cost": 15,
+      "savings": 4.99
+    }
+  ],
+  "quoteSettings": {
+    "financingMonths": 36,
+    "connectedDeviceDiscountRate": 0.5,
+    "individualProtection": {
+      "Smartphone": 19,
+      "Watch": 19,
+      "Tablet": 16
+    },
+    "multiDeviceProtection": {
+      "perLine": 19,
+      "monthlyCap": 68
+    }
+  }
+}
