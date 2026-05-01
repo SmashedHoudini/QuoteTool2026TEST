@@ -10,6 +10,15 @@
       "price": 829.99
     },
     {
+      "id": "apple-iphone-17-512gb",
+      "enabled": true,
+      "type": "Smartphone",
+      "manufacturer": "Apple",
+      "model": "iPhone 17",
+      "storage": "512GB",
+      "price": 1039.99
+    },
+    {
       "id": "google-pixel-10-128gb",
       "enabled": true,
       "type": "Smartphone",
