@@ -49,6 +49,7 @@
         });
         requiredArray(config.perks, 'perks').forEach((perk, index) => {
             requiredNumber(perk.cost, `perks[${index}].cost`);
+            requiredNumber(perk.savings, `perks[${index}].savings`);
         });
 
         const settings = requiredObject(config.quoteSettings, 'quoteSettings');
@@ -157,6 +158,7 @@
             }
 
             const perkCost = line.perks.reduce((acc, name) => acc + findByName(PERKS, name, 'perks').cost, 0);
+            const perkSavings = line.perks.reduce((acc, name) => acc + findByName(PERKS, name, 'perks').savings, 0);
             const adjSum = sumAdjustments(line.adjustments);
 
             let protCost = 0;
@@ -168,7 +170,7 @@
                 }
             }
 
-            const deviceMonthly = Math.max(0, (line.devicePrice / financingMonths) - (line.promoCredit / financingMonths));
+            const deviceMonthly = (parseAmount(line.devicePrice) / financingMonths) - (parseAmount(line.promoCredit) / financingMonths);
             const monthlyPromoCredit = parseAmount(line.promoCredit) / financingMonths;
             const taxSurcharge = getTaxSurchargeForLine(line, taxSettings);
 
@@ -180,6 +182,7 @@
                 mhSaving,
                 displayName,
                 perkCost,
+                perkSavings,
                 protCost,
                 deviceMonthly,
                 adjSum,
@@ -223,6 +226,7 @@
         const totalFullDeviceSavings = finalLines.reduce((acc, line) => acc + parseAmount(line.promoCredit), 0);
         const totalAutopay = finalLines.reduce((acc, line) => acc + line.autopaySaving, 0);
         const totalMHSavings = finalLines.reduce((acc, line) => acc + line.mhSaving, 0);
+        const totalPerkSavings = finalLines.reduce((acc, line) => acc + line.perkSavings, 0);
         const totalConnectedDiscounts = finalLines.reduce((acc, line) => acc + (line.connectedDiscountAmt || 0), 0);
         const totalMonthlyPromoCredits = finalLines.reduce((acc, line) => acc + line.monthlyPromoCredit, 0);
         const allAdjustments = [...finalLines.flatMap(line => line.adjustments), ...accountAdjustments];
@@ -234,7 +238,7 @@
             acc + (item.type === 'charge' ? parseAmount(item.amount) : 0)
         ), 0);
         const totalOneTimeNet = totalOneTimeCharges - totalOneTimeCredits;
-        const totalMonthlySavings = totalMonthlyPromoCredits + totalAutopay + totalMHSavings + totalConnectedDiscounts + totalAdjustmentCredits;
+        const totalMonthlySavings = totalMonthlyPromoCredits + totalAutopay + totalMHSavings + totalConnectedDiscounts + totalAdjustmentCredits + totalPerkSavings;
 
         return {
             processedLines: finalLines,
@@ -247,6 +251,7 @@
             totalMonthlySavings,
             totalAutopay,
             totalMHSavings,
+            totalPerkSavings,
             totalAdjustmentCredits,
             totalConnectedDiscounts,
             totalOneTimeCredits,

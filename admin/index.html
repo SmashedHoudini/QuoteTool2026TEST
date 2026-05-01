@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!--
+    Local pricing admin.
+
+    This page intentionally uses plain HTML, CSS, and JavaScript. It is meant to
+    be durable and easy to change, not fancy. For now it runs locally through
+    server.js so it can save pricing.json directly. Later, the same /admin path
+    can be wired to a hosted backend or GitHub API.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCC Quote Tool Admin</title>
+    <link rel="stylesheet" href="styles.css?v=20260501-2">
+</head>
+<body>
+    <header class="app-header">
+        <div>
+            <div class="brand">
+                <strong>verizon</strong>
+                <span></span>
+                <em>TCC</em>
+            </div>
+            <h1>Pricing Admin</h1>
+        </div>
+        <div class="actions">
+            <button id="reloadBtn" type="button">Reload</button>
+            <button id="saveBtn" type="button" class="primary">Save Changes</button>
+        </div>
+    </header>
+
+    <main>
+        <section class="notice">
+            <p>Edit pricing values here, save locally, then commit and push `pricing.json` when ready.</p>
+            <strong id="statusText">Loading pricing.json...</strong>
+        </section>
+
+        <nav class="tabs" aria-label="Admin sections">
+            <button type="button" data-tab="plans" class="active">Plans</button>
+            <button type="button" data-tab="perks">Perks</button>
+            <button type="button" data-tab="devices">Devices</button>
+            <button type="button" data-tab="other">Other</button>
+        </nav>
+
+        <section id="editor"></section>
+    </main>
+
+    <div id="confirmDialog" class="confirm-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <div class="confirm-box">
+            <h2 id="confirmTitle">Are you sure you want to delete this?</h2>
+            <div class="confirm-actions">
+                <button id="confirmCancelBtn" type="button">Cancel</button>
+                <button id="confirmDeleteBtn" type="button" class="primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=20260501-2"></script>
+</body>
+</html>

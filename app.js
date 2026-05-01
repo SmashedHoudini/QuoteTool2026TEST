@@ -65,6 +65,13 @@ const App = ({ config }) => {
     const [includeEstimatedTaxes, setIncludeEstimatedTaxes] = useState(false);
     const [activeCustomTaxLineId, setActiveCustomTaxLineId] = useState(null);
     const [activeCustomProtectionLineId, setActiveCustomProtectionLineId] = useState(null);
+    const [hardwareMode, setHardwareMode] = useState('');
+    const [selectedDeviceManufacturer, setSelectedDeviceManufacturer] = useState('');
+    const [selectedDeviceModel, setSelectedDeviceModel] = useState('');
+    const [selectedDeviceStorage, setSelectedDeviceStorage] = useState('');
+    const [canReturnToDevicePicker, setCanReturnToDevicePicker] = useState(false);
+    const [hardwareAmountMode, setHardwareAmountMode] = useState('total');
+    const [hardwareAmountInputs, setHardwareAmountInputs] = useState({ devicePrice: '', promoCredit: '' });
     
     // PDF Generation States
     const [scale, setScale] = useState(1);
@@ -134,6 +141,16 @@ const App = ({ config }) => {
         }
     }, [view, pdfHeight, customerViewMode]);
 
+    useEffect(() => {
+        const line = lines.find(candidate => candidate.id === activeHardwareLineId);
+        if (!line) return;
+
+        setHardwareAmountInputs({
+            devicePrice: getHardwareAmountValue(line.devicePrice, hardwareAmountMode),
+            promoCredit: getHardwareAmountValue(line.promoCredit, hardwareAmountMode)
+        });
+    }, [activeHardwareLineId, hardwareAmountMode]);
+
     const handlePrintPreview = () => {
         setView('print');
         window.scrollTo(0, 0); // Always start preview at the top
@@ -171,6 +188,26 @@ const App = ({ config }) => {
         setLines(prev => prev.map(l => (
             l.id === id ? withPlanDefaultForType(l, updates, config) : l
         )));
+    };
+
+    const openHardwareModal = (lineId) => {
+        setActiveHardwareLineId(lineId);
+        setHardwareMode('');
+        setSelectedDeviceManufacturer('');
+        setSelectedDeviceModel('');
+        setSelectedDeviceStorage('');
+        setCanReturnToDevicePicker(false);
+        setHardwareAmountMode('total');
+    };
+
+    const closeHardwareModal = () => {
+        setActiveHardwareLineId(null);
+        setHardwareMode('');
+        setSelectedDeviceManufacturer('');
+        setSelectedDeviceModel('');
+        setSelectedDeviceStorage('');
+        setCanReturnToDevicePicker(false);
+        setHardwareAmountMode('total');
     };
 
     const togglePerk = (lineId, perkName) => {
@@ -244,6 +281,46 @@ const App = ({ config }) => {
     );
 
     const formatRoundedDollars = (amount) => `$${Math.round(amount).toLocaleString()}`;
+    const formatDollars = (amount) => {
+        const value = parseFloat(amount) || 0;
+        const formatted = Math.abs(value).toFixed(2);
+        return value < 0 ? `-$${formatted}` : `$${formatted}`;
+    };
+
+    const getHardwareAmountValue = (amount, mode = hardwareAmountMode) => {
+        const totalAmount = parseFloat(amount) || 0;
+        if (!totalAmount) return '';
+        return mode === 'monthly'
+            ? (totalAmount / FINANCING_MONTHS).toFixed(2)
+            : String(totalAmount);
+    };
+
+    const getStorageSortValue = (storage = '') => {
+        const match = String(storage).match(/(\d+(?:\.\d+)?)\s*(TB|GB)?/i);
+        if (!match) return Number.MAX_SAFE_INTEGER;
+        const size = parseFloat(match[1]);
+        return match[2]?.toUpperCase() === 'TB' ? size * 1024 : size;
+    };
+
+    const getDeviceDisplayName = (device) => (
+        [device.model, device.storage].filter(Boolean).join(' ')
+    );
+
+    const applyDeviceFromCatalog = (device) => {
+        if (!device || !activeHardwareLineId) return;
+        const devicePrice = parseFloat(device.price) || 0;
+        updateLine(activeHardwareLineId, {
+            deviceName: getDeviceDisplayName(device),
+            devicePrice
+        });
+        setHardwareAmountMode('total');
+        setHardwareAmountInputs({
+            devicePrice: devicePrice ? String(devicePrice) : '',
+            promoCredit: activeHardwareLine?.promoCredit ? String(activeHardwareLine.promoCredit) : ''
+        });
+        setHardwareMode('custom');
+        setCanReturnToDevicePicker(true);
+    };
 
     const getLineIconName = (lineType) => {
         if (lineType === 'Tablet') return 'Tablet';
@@ -292,6 +369,54 @@ const App = ({ config }) => {
     const activeHardwareLine = lines.find(l => l.id === activeHardwareLineId);
     const activeCustomTaxLine = lines.find(l => l.id === activeCustomTaxLineId);
     const activeCustomProtectionLine = lines.find(l => l.id === activeCustomProtectionLineId);
+    const catalogDevicesForLine = (config.devices || [])
+        .filter(device => device.enabled !== false && device.type === activeHardwareLine?.type);
+    const deviceManufacturers = [...new Set(catalogDevicesForLine.map(device => device.manufacturer).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const manufacturerDevices = catalogDevicesForLine.filter(device => device.manufacturer === selectedDeviceManufacturer);
+    const deviceModels = [...new Set(manufacturerDevices.map(device => device.model).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const modelDevices = manufacturerDevices
+        .filter(device => device.model === selectedDeviceModel)
+        .sort((a, b) => getStorageSortValue(a.storage) - getStorageSortValue(b.storage));
+    const storageOptions = [...new Set(modelDevices.map(device => device.storage).filter(Boolean))]
+        .sort((a, b) => getStorageSortValue(a) - getStorageSortValue(b));
+    const handleDeviceManufacturerChange = (manufacturer) => {
+        setSelectedDeviceManufacturer(manufacturer);
+        setSelectedDeviceModel('');
+        setSelectedDeviceStorage('');
+    };
+    const handleDeviceModelChange = (model) => {
+        setSelectedDeviceModel(model);
+        setSelectedDeviceStorage('');
+
+        const matches = manufacturerDevices
+            .filter(device => device.model === model)
+            .sort((a, b) => getStorageSortValue(a.storage) - getStorageSortValue(b.storage));
+        const uniqueStorageOptions = [...new Set(matches.map(device => device.storage).filter(Boolean))];
+
+        // When there is no real storage choice, pick the device right away.
+        if (matches.length === 1 || uniqueStorageOptions.length <= 1) {
+            applyDeviceFromCatalog(matches[0]);
+        }
+    };
+    const handleDeviceStorageChange = (storage) => {
+        setSelectedDeviceStorage(storage);
+        applyDeviceFromCatalog(modelDevices.find(device => device.storage === storage) || modelDevices[0]);
+    };
+    const updateHardwareAmount = (field, value) => {
+        setHardwareAmountInputs(prev => ({ ...prev, [field]: value }));
+        const amount = parseFloat(value) || 0;
+        updateLine(activeHardwareLineId, {
+            [field]: hardwareAmountMode === 'monthly' ? amount * FINANCING_MONTHS : amount
+        });
+    };
+    const returnToDevicePicker = () => {
+        setHardwareMode('catalog');
+        setSelectedDeviceManufacturer('');
+        setSelectedDeviceModel('');
+        setSelectedDeviceStorage('');
+        setCanReturnToDevicePicker(false);
+        setHardwareAmountMode('total');
+    };
     return (
         <div className="min-h-screen">
             {/* Only show nav if not currently in print preview mode */}
@@ -419,8 +544,8 @@ const App = ({ config }) => {
                                             <span className="text-[11px] font-bold text-black/40 block uppercase tracking-wider">Hardware</span>
                                             {line.type !== 'Home Internet' ? (
                                                 <div className="flex flex-row gap-3 md:gap-4 items-center">
-                                                    <button onClick={() => setActiveHardwareLineId(line.id)} className="hardware-btn flex-1 basis-1/2 w-full min-w-0 md:min-w-[220px] px-4 md:px-6 py-4 bg-stone-50 border border-black/5 rounded-xl hover:bg-black hover:text-white flex items-center gap-3 text-left shadow-sm active:scale-95 transition-all text-black"><Icon name="Smartphone" size={20} className="shrink-0" /><div className="flex flex-col min-w-0"><span className="text-sm font-bold truncate max-w-[160px]">{line.deviceName || 'Select device'}</span><span className="text-[10px] opacity-60 font-medium">Configure</span></div></button>
-                                                    <div className="flex flex-col flex-1 basis-1/2 min-w-0 items-center text-center"><span className="text-[10px] opacity-40 font-bold uppercase tracking-wider">MONTHLY PAYMENT</span><span className="text-xl font-black">${line.deviceMonthly.toFixed(2)}</span></div>
+                                                    <button onClick={() => openHardwareModal(line.id)} className="hardware-btn flex-1 basis-1/2 w-full min-w-0 md:min-w-[220px] px-4 md:px-6 py-4 bg-stone-50 border border-black/5 rounded-xl hover:bg-black hover:text-white flex items-center gap-3 text-left shadow-sm active:scale-95 transition-all text-black"><Icon name="Smartphone" size={20} className="shrink-0" /><div className="flex flex-col min-w-0"><span className="text-sm font-bold truncate max-w-[160px]">{line.deviceName || 'Select device'}</span><span className="text-[10px] opacity-60 font-medium">Configure</span></div></button>
+                                                    <div className="flex flex-col flex-1 basis-1/2 min-w-0 items-center text-center"><span className="text-[10px] opacity-40 font-bold uppercase tracking-wider">MONTHLY PAYMENT</span><span className="text-xl font-black">{formatDollars(line.deviceMonthly)}</span></div>
                                                 </div>
                                             ) : <div className="h-full flex items-center text-black/20 italic text-sm">Not applicable</div>}
                                         </div>
@@ -500,7 +625,7 @@ const App = ({ config }) => {
                                                                     {line.autopaySaving > 0 && <p className="text-sm text-emerald-600 font-bold">-${line.autopaySaving.toFixed(2)} Auto Pay & Paper-free Discount</p>}
                                                                     {line.mhSaving > 0 && <p className="text-sm text-emerald-600 font-bold">-${line.mhSaving.toFixed(2)} Mobile + Home Discount</p>}
                                                                     {line.isDiscounted && <p className="text-sm text-emerald-600 font-bold">-${line.connectedDiscountAmt.toFixed(2)} Connected Device Discount</p>}
-                                                                    {line.devicePrice > 0 && <p className="text-sm font-medium opacity-50">${line.deviceMonthly.toFixed(2)} Device Payment</p>}
+                                                                    {line.devicePrice > 0 && <p className="text-sm font-medium opacity-50">{formatDollars(line.deviceMonthly)} Device Payment</p>}
                                                                     {line.perks.map(pName => <p key={pName} className="text-sm font-medium opacity-50">${getPerkCost(pName).toFixed(2)} {pName}</p>)}
                                                                     {line.adjustments.map(adj => <p key={adj.id} className={`text-sm tracking-tight ${adj.type === 'credit' ? 'text-emerald-600 font-bold' : 'opacity-50'}`}>{adj.type === 'credit' ? '-' : ''}${parseFloat(adj.amount || 0).toFixed(2)} {adj.label}</p>)}
                                                                     {line.protCost > 0 && <p className="text-sm font-medium opacity-50">${line.protCost}.00 Device protection</p>}
@@ -654,7 +779,7 @@ const App = ({ config }) => {
                                                                             {line.autopaySaving > 0 && <p className="text-xs text-black font-semibold opacity-80">-${line.autopaySaving.toFixed(2)} Auto Pay & Paper-free Discount</p>}
                                                                             {line.mhSaving > 0 && <p className="text-xs text-black font-semibold opacity-80">-${line.mhSaving.toFixed(2)} Mobile + Home Discount</p>}
                                                                             {line.isDiscounted && <p className="text-xs text-black font-semibold opacity-80">-${line.connectedDiscountAmt.toFixed(2)} Connected Device Discount</p>}
-                                                                            {line.devicePrice > 0 && <p className="text-xs font-medium opacity-80">${line.deviceMonthly.toFixed(2)} Device Payment</p>}
+                                                                            {line.devicePrice > 0 && <p className="text-xs font-medium opacity-80">{formatDollars(line.deviceMonthly)} Device Payment</p>}
                                                                             {line.perks.map(pName => <p key={pName} className="text-xs font-medium opacity-80">${getPerkCost(pName).toFixed(2)} {pName}</p>)}
                                                                             {line.adjustments.map(adj => <p key={adj.id} className={`text-xs tracking-tight ${adj.type === 'credit' ? 'text-black font-semibold opacity-80' : 'opacity-80'}`}>{adj.type === 'credit' ? '-' : ''}${parseFloat(adj.amount || 0).toFixed(2)} {adj.label}</p>)}
                                                                             {line.protCost > 0 && <p className="text-xs font-medium opacity-80">${line.protCost}.00 Device protection</p>}
@@ -786,18 +911,73 @@ const App = ({ config }) => {
 
             {/* Modals remain exactly as before */}
             {activeHardwareLineId && activeHardwareLine && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setActiveHardwareLineId(null)}>
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={closeHardwareModal}>
                     <div className="relative w-full max-w-md bg-white rounded-[32px] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="p-8 border-b border-black/5 bg-stone-50 flex justify-between items-center"><h2 className="text-xl font-black leading-none">Hardware settings.</h2><button onClick={() => setActiveHardwareLineId(null)} className="p-2 hover:bg-black/5 rounded-full"><Icon name="X" size={24}/></button></div>
-                        <div className="p-8 space-y-6">
-                            <div className="space-y-2"><label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Device name</label><input value={activeHardwareLine.deviceName} onFocus={e => e.target.select()} onChange={e => updateLine(activeHardwareLineId, { deviceName: e.target.value })} placeholder="e.g. iPhone 16 Pro" className="w-full px-5 py-4 bg-stone-50 border border-black/10 rounded-2xl outline-none font-bold text-lg focus:border-black text-black" /></div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-3"><label className="text-[11px] font-bold uppercase tracking-widest opacity-40">Retail price</label><input type="number" inputMode="decimal" onWheel={e => e.currentTarget.blur()} value={activeHardwareLine.devicePrice || ''} onFocus={e => e.target.select()} onChange={e => updateLine(activeHardwareLineId, { devicePrice: parseFloat(e.target.value) || 0 })} placeholder="0.00" className="w-full px-6 py-5 bg-stone-50 border border-black/10 rounded-2xl font-bold text-lg outline-none focus:border-black text-black" /></div>
-                                <div className="space-y-3 text-black"><label className="text-[11px] font-bold uppercase tracking-widest text-verizon-red">Promo credit</label><input type="number" inputMode="decimal" onWheel={e => e.currentTarget.blur()} value={activeHardwareLine.promoCredit || ''} onFocus={e => e.target.select()} onChange={e => updateLine(activeHardwareLineId, { promoCredit: parseFloat(e.target.value) || 0 })} placeholder="0.00" className="w-full px-6 py-5 bg-stone-50 border border-black/10 rounded-2xl font-bold text-lg text-verizon-red outline-none focus:border-red-500 text-black" /></div>
+                        <div className="p-8 border-b border-black/5 bg-stone-50 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                {canReturnToDevicePicker && <button onClick={returnToDevicePicker} title="Select another device" className="p-2 hover:bg-black/5 rounded-full text-black/50 hover:text-black transition-colors"><Icon name="RefreshCcw" size={18}/></button>}
+                                <h2 className="text-xl font-black leading-none">Hardware settings.</h2>
                             </div>
-                            <div className="p-8 bg-black text-white rounded-[28px] flex justify-between items-center shadow-xl text-white"><div><p className="text-[11px] font-bold opacity-60">Net monthly</p><p className="text-4xl font-black tracking-tight">${((activeHardwareLine.devicePrice - activeHardwareLine.promoCredit)/FINANCING_MONTHS).toFixed(2)}</p></div><div className="text-right text-xs font-bold opacity-60 uppercase tracking-widest">{FINANCING_MONTHS} Months</div></div>
+                            <button onClick={closeHardwareModal} className="p-2 hover:bg-black/5 rounded-full"><Icon name="X" size={24}/></button>
                         </div>
-                        <div className="p-8 border-t border-black/5 text-black"><button onClick={() => setActiveHardwareLineId(null)} className="w-full py-6 bg-black text-white rounded-2xl font-black text-xl hover:scale-[1.01] active:scale-95 transition-all shadow-lg text-white">Done</button></div>
+                        <div className="p-8 space-y-6">
+                            {!hardwareMode && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <button onClick={() => { setHardwareMode('custom'); setCanReturnToDevicePicker(false); }} className="p-5 bg-stone-50 text-black border border-black/10 rounded-2xl font-black text-left flex items-center justify-between hover:bg-black hover:text-white active:scale-95 transition-all"><span>Custom</span><Icon name="Edit3" size={20} /></button>
+                                    <button onClick={() => { setHardwareMode('catalog'); setCanReturnToDevicePicker(false); }} disabled={deviceManufacturers.length === 0} className={`p-5 rounded-2xl font-black text-left flex items-center justify-between transition-all ${deviceManufacturers.length === 0 ? 'bg-stone-100 text-black/25 cursor-not-allowed' : 'bg-stone-50 text-black border border-black/10 hover:bg-black hover:text-white active:scale-95'}`}><span>Select Manufacturer</span><Icon name="ChevronRight" size={20} /></button>
+                                </div>
+                            )}
+
+                            {hardwareMode === 'catalog' && (
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Select manufacturer</label>
+                                        <select value={selectedDeviceManufacturer} onChange={e => handleDeviceManufacturerChange(e.target.value)} className="w-full px-5 py-5 bg-stone-50 border border-black/10 rounded-2xl outline-none font-bold text-lg focus:border-black text-black">
+                                            <option value="">Choose manufacturer</option>
+                                            {deviceManufacturers.map(manufacturer => <option key={manufacturer} value={manufacturer}>{manufacturer}</option>)}
+                                        </select>
+                                    </div>
+
+                                    {selectedDeviceManufacturer && (
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Select model</label>
+                                            <select value={selectedDeviceModel} onChange={e => handleDeviceModelChange(e.target.value)} className="w-full px-5 py-5 bg-stone-50 border border-black/10 rounded-2xl outline-none font-bold text-lg focus:border-black text-black">
+                                                <option value="">Choose model</option>
+                                                {deviceModels.map(model => <option key={model} value={model}>{model}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {selectedDeviceModel && storageOptions.length > 1 && (
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Select storage</label>
+                                            <select value={selectedDeviceStorage} onChange={e => handleDeviceStorageChange(e.target.value)} className="w-full px-5 py-5 bg-stone-50 border border-black/10 rounded-2xl outline-none font-bold text-lg focus:border-black text-black">
+                                                <option value="">Choose storage</option>
+                                                {storageOptions.map(storage => <option key={storage} value={storage}>{storage}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {hardwareMode === 'custom' && (
+                                <>
+                                    <div className="flex justify-end">
+                                        <div className="flex gap-1 p-1 bg-black/5 rounded-full">
+                                            <button onClick={() => setHardwareAmountMode('total')} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase transition-all ${hardwareAmountMode === 'total' ? 'bg-black text-white shadow-sm' : 'text-black/40 hover:text-black'}`}>Total</button>
+                                            <button onClick={() => setHardwareAmountMode('monthly')} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase transition-all ${hardwareAmountMode === 'monthly' ? 'bg-black text-white shadow-sm' : 'text-black/40 hover:text-black'}`}>Monthly</button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2"><label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Device name</label><input value={activeHardwareLine.deviceName} onFocus={e => e.target.select()} onChange={e => updateLine(activeHardwareLineId, { deviceName: e.target.value })} placeholder="e.g. iPhone 16 Pro" className="w-full px-5 py-4 bg-stone-50 border border-black/10 rounded-2xl outline-none font-bold text-lg focus:border-black text-black" /></div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-3"><label className="text-[11px] font-bold uppercase tracking-widest opacity-40">{hardwareAmountMode === 'monthly' ? 'Monthly payment' : 'Retail price'}</label><input type="number" inputMode="decimal" onWheel={e => e.currentTarget.blur()} value={hardwareAmountInputs.devicePrice} onFocus={e => e.target.select()} onChange={e => updateHardwareAmount('devicePrice', e.target.value)} placeholder="0.00" className="w-full px-6 py-5 bg-stone-50 border border-black/10 rounded-2xl font-bold text-lg outline-none focus:border-black text-black" /></div>
+                                        <div className="space-y-3 text-black"><label className="text-[11px] font-bold uppercase tracking-widest text-verizon-red">{hardwareAmountMode === 'monthly' ? 'Monthly credit' : 'Promo credit'}</label><input type="number" inputMode="decimal" onWheel={e => e.currentTarget.blur()} value={hardwareAmountInputs.promoCredit} onFocus={e => e.target.select()} onChange={e => updateHardwareAmount('promoCredit', e.target.value)} placeholder="0.00" className="w-full px-6 py-5 bg-stone-50 border border-black/10 rounded-2xl font-bold text-lg text-verizon-red outline-none focus:border-red-500 text-black" /></div>
+                                    </div>
+                                    <div className="p-8 bg-black text-white rounded-[28px] flex justify-between items-center shadow-xl text-white"><div><p className="text-[11px] font-bold opacity-60">Net monthly</p><p className="text-4xl font-black tracking-tight">{formatDollars(((parseFloat(activeHardwareLine.devicePrice) || 0) - (parseFloat(activeHardwareLine.promoCredit) || 0))/FINANCING_MONTHS)}</p></div><div className="text-right text-xs font-bold opacity-60 uppercase tracking-widest">{FINANCING_MONTHS} Months</div></div>
+                                </>
+                            )}
+                        </div>
+                        <div className="p-8 border-t border-black/5 text-black"><button onClick={closeHardwareModal} className="w-full py-6 bg-black text-white rounded-2xl font-black text-xl hover:scale-[1.01] active:scale-95 transition-all shadow-lg text-white">Done</button></div>
                     </div>
                 </div>
             )}

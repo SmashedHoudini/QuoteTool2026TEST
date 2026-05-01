@@ -1,5 +1,34 @@
 {
-  "_fileNote": "Editable pricing/config for the V2 quote tool. The app loads this file at startup on GitHub Pages. Change plan names, prices, perk costs, protection prices, financing months, tax estimates, and discount settings here; change only the math rules in calculations.js.",
+  "devices": [
+    {
+      "id": "apple-iphone-17-256gb",
+      "enabled": true,
+      "type": "Smartphone",
+      "manufacturer": "Apple",
+      "model": "iPhone 17",
+      "storage": "256GB",
+      "price": 829.99
+    },
+    {
+      "id": "google-pixel-10-128gb",
+      "enabled": true,
+      "type": "Smartphone",
+      "manufacturer": "Google",
+      "model": "Pixel 10",
+      "storage": "128GB",
+      "price": 799.99
+    },
+    {
+      "id": "samsung-galaxy-s26-256gb",
+      "enabled": true,
+      "type": "Smartphone",
+      "manufacturer": "Samsung",
+      "model": "Galaxy S26",
+      "storage": "256GB",
+      "price": 899.99
+    }
+  ],
+  "_fileNote": "Editable pricing/config for the V2 quote tool. The app loads this file at startup on GitHub Pages. Change plan names, prices, perk costs, device presets, protection prices, financing months, tax estimates, and discount settings here; change only the math rules in calculations.js.",
   "smartphonePlans": [
     {
       "name": "Unlimited Welcome",
@@ -132,9 +161,9 @@
       "savings": 8.98
     },
     {
-      "name": "Google AI Pro",
+      "name": "100GB Hotspot",
       "cost": 10,
-      "savings": 9.99
+      "savings": 30
     },
     {
       "name": "Apple One Individual",
@@ -152,14 +181,14 @@
       "savings": 6.99
     },
     {
-      "name": "100GB Hotspot",
-      "cost": 10,
-      "savings": 30
-    },
-    {
       "name": "YouTube Premium",
       "cost": 10,
       "savings": 3.99
+    },
+    {
+      "name": "Google AI Pro",
+      "cost": 10,
+      "savings": 9.99
     },
     {
       "name": "Unlimited Cloud Storage",
