@@ -69,8 +69,8 @@ const App = ({ config }) => {
     const [selectedDeviceManufacturer, setSelectedDeviceManufacturer] = useState('');
     const [selectedDeviceModel, setSelectedDeviceModel] = useState('');
     const [selectedDeviceStorage, setSelectedDeviceStorage] = useState('');
-    const [canReturnToDevicePicker, setCanReturnToDevicePicker] = useState(false);
     const [hardwareAmountMode, setHardwareAmountMode] = useState('total');
+    const [hardwarePromoMode, setHardwarePromoMode] = useState('credit');
     const [hardwareAmountInputs, setHardwareAmountInputs] = useState({ devicePrice: '', promoCredit: '' });
     
     // PDF Generation States
@@ -191,13 +191,14 @@ const App = ({ config }) => {
     };
 
     const openHardwareModal = (lineId) => {
+        const line = lines.find(candidate => candidate.id === lineId);
         setActiveHardwareLineId(lineId);
-        setHardwareMode('');
+        setHardwareMode('custom');
         setSelectedDeviceManufacturer('');
         setSelectedDeviceModel('');
         setSelectedDeviceStorage('');
-        setCanReturnToDevicePicker(false);
         setHardwareAmountMode('total');
+        setHardwarePromoMode(line && line.devicePrice > 0 && line.devicePrice === line.promoCredit ? 'free' : 'credit');
     };
 
     const closeHardwareModal = () => {
@@ -206,8 +207,8 @@ const App = ({ config }) => {
         setSelectedDeviceManufacturer('');
         setSelectedDeviceModel('');
         setSelectedDeviceStorage('');
-        setCanReturnToDevicePicker(false);
         setHardwareAmountMode('total');
+        setHardwarePromoMode('credit');
     };
 
     const togglePerk = (lineId, perkName) => {
@@ -309,17 +310,18 @@ const App = ({ config }) => {
     const applyDeviceFromCatalog = (device) => {
         if (!device || !activeHardwareLineId) return;
         const devicePrice = parseFloat(device.price) || 0;
+        const promoCredit = hardwarePromoMode === 'free' ? devicePrice : parseFloat(activeHardwareLine?.promoCredit) || 0;
         updateLine(activeHardwareLineId, {
             deviceName: getDeviceDisplayName(device),
-            devicePrice
+            devicePrice,
+            promoCredit
         });
         setHardwareAmountMode('total');
         setHardwareAmountInputs({
             devicePrice: devicePrice ? String(devicePrice) : '',
-            promoCredit: activeHardwareLine?.promoCredit ? String(activeHardwareLine.promoCredit) : ''
+            promoCredit: promoCredit ? String(promoCredit) : ''
         });
         setHardwareMode('custom');
-        setCanReturnToDevicePicker(true);
     };
 
     const getLineIconName = (lineType) => {
@@ -405,16 +407,38 @@ const App = ({ config }) => {
     const updateHardwareAmount = (field, value) => {
         setHardwareAmountInputs(prev => ({ ...prev, [field]: value }));
         const amount = parseFloat(value) || 0;
+        const totalAmount = hardwareAmountMode === 'monthly' ? amount * FINANCING_MONTHS : amount;
+
+        if (field === 'devicePrice' && hardwarePromoMode === 'free') {
+            updateLine(activeHardwareLineId, {
+                devicePrice: totalAmount,
+                promoCredit: totalAmount
+            });
+            setHardwareAmountInputs(prev => ({ ...prev, devicePrice: value, promoCredit: value }));
+            return;
+        }
+
         updateLine(activeHardwareLineId, {
-            [field]: hardwareAmountMode === 'monthly' ? amount * FINANCING_MONTHS : amount
+            [field]: totalAmount
         });
     };
-    const returnToDevicePicker = () => {
+    const setPromoMode = (mode) => {
+        setHardwarePromoMode(mode);
+
+        if (mode === 'free') {
+            const devicePrice = parseFloat(activeHardwareLine?.devicePrice) || 0;
+            updateLine(activeHardwareLineId, { promoCredit: devicePrice });
+            setHardwareAmountInputs(prev => ({
+                ...prev,
+                promoCredit: getHardwareAmountValue(devicePrice, hardwareAmountMode)
+            }));
+        }
+    };
+    const openDevicePicker = () => {
         setHardwareMode('catalog');
         setSelectedDeviceManufacturer('');
         setSelectedDeviceModel('');
         setSelectedDeviceStorage('');
-        setCanReturnToDevicePicker(false);
         setHardwareAmountMode('total');
     };
     return (
@@ -915,19 +939,11 @@ const App = ({ config }) => {
                     <div className="relative w-full max-w-md bg-white rounded-[32px] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
                         <div className="p-8 border-b border-black/5 bg-stone-50 flex justify-between items-center">
                             <div className="flex items-center gap-3">
-                                {canReturnToDevicePicker && <button onClick={returnToDevicePicker} title="Select another device" className="p-2 hover:bg-black/5 rounded-full text-black/50 hover:text-black transition-colors"><Icon name="RefreshCcw" size={18}/></button>}
                                 <h2 className="text-xl font-black leading-none">Hardware settings.</h2>
                             </div>
                             <button onClick={closeHardwareModal} className="p-2 hover:bg-black/5 rounded-full"><Icon name="X" size={24}/></button>
                         </div>
                         <div className="p-8 space-y-6">
-                            {!hardwareMode && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <button onClick={() => { setHardwareMode('custom'); setCanReturnToDevicePicker(false); }} className="p-5 bg-stone-50 text-black border border-black/10 rounded-2xl font-black text-left flex items-center justify-between hover:bg-black hover:text-white active:scale-95 transition-all"><span>Custom</span><Icon name="Edit3" size={20} /></button>
-                                    <button onClick={() => { setHardwareMode('catalog'); setCanReturnToDevicePicker(false); }} disabled={deviceManufacturers.length === 0} className={`p-5 rounded-2xl font-black text-left flex items-center justify-between transition-all ${deviceManufacturers.length === 0 ? 'bg-stone-100 text-black/25 cursor-not-allowed' : 'bg-stone-50 text-black border border-black/10 hover:bg-black hover:text-white active:scale-95'}`}><span>Select Manufacturer</span><Icon name="ChevronRight" size={20} /></button>
-                                </div>
-                            )}
-
                             {hardwareMode === 'catalog' && (
                                 <div className="space-y-4">
                                     <div className="space-y-2">
@@ -962,7 +978,8 @@ const App = ({ config }) => {
 
                             {hardwareMode === 'custom' && (
                                 <>
-                                    <div className="flex justify-end">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <button onClick={openDevicePicker} disabled={deviceManufacturers.length === 0} className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase transition-all flex items-center gap-2 ${deviceManufacturers.length === 0 ? 'bg-stone-100 text-black/25 cursor-not-allowed' : 'bg-stone-50 text-black/60 border border-black/10 hover:bg-black hover:text-white'}`}><Icon name="Search" size={13} /> Select device</button>
                                         <div className="flex gap-1 p-1 bg-black/5 rounded-full">
                                             <button onClick={() => setHardwareAmountMode('total')} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase transition-all ${hardwareAmountMode === 'total' ? 'bg-black text-white shadow-sm' : 'text-black/40 hover:text-black'}`}>Total</button>
                                             <button onClick={() => setHardwareAmountMode('monthly')} className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase transition-all ${hardwareAmountMode === 'monthly' ? 'bg-black text-white shadow-sm' : 'text-black/40 hover:text-black'}`}>Monthly</button>
@@ -970,8 +987,14 @@ const App = ({ config }) => {
                                     </div>
                                     <div className="space-y-2"><label className="text-[10px] font-bold uppercase tracking-widest opacity-40">Device name</label><input value={activeHardwareLine.deviceName} onFocus={e => e.target.select()} onChange={e => updateLine(activeHardwareLineId, { deviceName: e.target.value })} placeholder="e.g. iPhone 16 Pro" className="w-full px-5 py-4 bg-stone-50 border border-black/10 rounded-2xl outline-none font-bold text-lg focus:border-black text-black" /></div>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-3"><label className="text-[11px] font-bold uppercase tracking-widest opacity-40">{hardwareAmountMode === 'monthly' ? 'Monthly payment' : 'Retail price'}</label><input type="number" inputMode="decimal" onWheel={e => e.currentTarget.blur()} value={hardwareAmountInputs.devicePrice} onFocus={e => e.target.select()} onChange={e => updateHardwareAmount('devicePrice', e.target.value)} placeholder="0.00" className="w-full px-6 py-5 bg-stone-50 border border-black/10 rounded-2xl font-bold text-lg outline-none focus:border-black text-black" /></div>
-                                        <div className="space-y-3 text-black"><label className="text-[11px] font-bold uppercase tracking-widest text-verizon-red">{hardwareAmountMode === 'monthly' ? 'Monthly credit' : 'Promo credit'}</label><input type="number" inputMode="decimal" onWheel={e => e.currentTarget.blur()} value={hardwareAmountInputs.promoCredit} onFocus={e => e.target.select()} onChange={e => updateHardwareAmount('promoCredit', e.target.value)} placeholder="0.00" className="w-full px-6 py-5 bg-stone-50 border border-black/10 rounded-2xl font-bold text-lg text-verizon-red outline-none focus:border-red-500 text-black" /></div>
+                                        <div className="space-y-3"><label className="text-[11px] font-bold uppercase tracking-widest opacity-40">{hardwareAmountMode === 'monthly' ? 'Monthly payment' : 'Financed amount'}</label><input type="number" inputMode="decimal" onWheel={e => e.currentTarget.blur()} value={hardwareAmountInputs.devicePrice} onFocus={e => e.target.select()} onChange={e => updateHardwareAmount('devicePrice', e.target.value)} placeholder="0.00" className="w-full px-6 py-5 bg-stone-50 border border-black/10 rounded-2xl font-bold text-lg outline-none focus:border-black text-black" /></div>
+                                        <div className="space-y-3 text-black">
+                                            <div className="flex gap-1 p-1 bg-black/5 rounded-full w-fit">
+                                                <button onClick={() => setPromoMode('credit')} className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase transition-all ${hardwarePromoMode === 'credit' ? 'bg-black text-white shadow-sm' : 'text-black/40 hover:text-black'}`}>{hardwareAmountMode === 'monthly' ? 'Monthly credit' : 'Promo credit'}</button>
+                                                <button onClick={() => setPromoMode('free')} className={`px-3 py-1 rounded-full text-[9px] font-bold uppercase transition-all ${hardwarePromoMode === 'free' ? 'bg-black text-white shadow-sm' : 'text-black/40 hover:text-black'}`}>Free</button>
+                                            </div>
+                                            <input type="number" inputMode="decimal" disabled={hardwarePromoMode === 'free'} onWheel={e => e.currentTarget.blur()} value={hardwareAmountInputs.promoCredit} onFocus={e => e.target.select()} onChange={e => updateHardwareAmount('promoCredit', e.target.value)} placeholder="0.00" className={`w-full px-6 py-5 bg-stone-50 border border-black/10 rounded-2xl font-bold text-lg text-verizon-red outline-none focus:border-red-500 text-black ${hardwarePromoMode === 'free' ? 'opacity-60 cursor-not-allowed' : ''}`} />
+                                        </div>
                                     </div>
                                     <div className="p-8 bg-black text-white rounded-[28px] flex justify-between items-center shadow-xl text-white"><div><p className="text-[11px] font-bold opacity-60">Net monthly</p><p className="text-4xl font-black tracking-tight">{formatDollars(((parseFloat(activeHardwareLine.devicePrice) || 0) - (parseFloat(activeHardwareLine.promoCredit) || 0))/FINANCING_MONTHS)}</p></div><div className="text-right text-xs font-bold opacity-60 uppercase tracking-widest">{FINANCING_MONTHS} Months</div></div>
                                 </>

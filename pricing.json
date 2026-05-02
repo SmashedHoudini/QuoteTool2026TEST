@@ -7,16 +7,25 @@
       "manufacturer": "Apple",
       "model": "iPhone 17",
       "storage": "256GB",
-      "price": 829.99
+      "price": 830
     },
     {
-      "id": "apple-iphone-17-512gb",
+      "id": "apple-iphone-17-pro-256gb",
       "enabled": true,
       "type": "Smartphone",
       "manufacturer": "Apple",
-      "model": "iPhone 17",
-      "storage": "512GB",
-      "price": 1039.99
+      "model": "iPhone 17 Pro",
+      "storage": "256GB",
+      "price": 1100
+    },
+    {
+      "id": "apple-iphone-17-pro-max-256gb",
+      "enabled": true,
+      "type": "Smartphone",
+      "manufacturer": "Apple",
+      "model": "iPhone 17 Pro Max",
+      "storage": "256GB",
+      "price": 1200
     },
     {
       "id": "google-pixel-10-128gb",
@@ -25,7 +34,7 @@
       "manufacturer": "Google",
       "model": "Pixel 10",
       "storage": "128GB",
-      "price": 799.99
+      "price": 800
     },
     {
       "id": "samsung-galaxy-s26-256gb",
@@ -34,7 +43,43 @@
       "manufacturer": "Samsung",
       "model": "Galaxy S26",
       "storage": "256GB",
-      "price": 899.99
+      "price": 900
+    },
+    {
+      "id": "samsung-galaxy-s26-ultra-256gb",
+      "enabled": true,
+      "type": "Smartphone",
+      "manufacturer": "Samsung",
+      "model": "Galaxy S26 Ultra",
+      "storage": "256GB",
+      "price": 1300
+    },
+    {
+      "id": "samsung-galaxy-s26-256gb",
+      "enabled": true,
+      "type": "Smartphone",
+      "manufacturer": "Samsung",
+      "model": "Galaxy S26+",
+      "storage": "256GB",
+      "price": 1100
+    },
+    {
+      "id": "apple-ipad-a16-128gb",
+      "enabled": true,
+      "type": "Tablet",
+      "manufacturer": "Apple",
+      "model": "iPad A16",
+      "storage": "128GB",
+      "price": 500
+    },
+    {
+      "id": "apple-apple-watch-series-11",
+      "enabled": true,
+      "type": "Watch",
+      "manufacturer": "Apple",
+      "model": "Apple Watch Series 11",
+      "storage": "",
+      "price": 500
     }
   ],
   "_fileNote": "Editable pricing/config for the V2 quote tool. The app loads this file at startup on GitHub Pages. Change plan names, prices, perk costs, device presets, protection prices, financing months, tax estimates, and discount settings here; change only the math rules in calculations.js.",
